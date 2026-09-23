@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AFYAHIV CARE - SMS Simulator</title>
+    <style>
+        body { font-family: Arial; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 15px; }
+        select, textarea { width: 100%; padding: 10px; margin: 10px 0; border-radius: 8px; border: 1px solid #ddd; }
+        button { background: #1e8e3e; color: white; padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; }
+        .result { margin-top: 20px; padding: 15px; background: #e8f5e9; border-radius: 8px; display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📱 AFYAHIV CARE - SMS Simulator</h1>
+        <p>Simulate Africa's Talking SMS Gateway</p>
+        
+        <select id="patientSelect">
+            <option value="+254712345678">Mary Atieno (Kiswahili)</option>
+            <option value="+254723456789">John Omondi (English)</option>
+        </select>
+        
+        <textarea id="smsMessage" rows="4" placeholder="Type SMS message..."></textarea>
+        
+        <button onclick="sendSimulatedSMS()">Send SMS</button>
+        
+        <div id="result" class="result"></div>
+    </div>
+    
+    <script>
+        async function sendSimulatedSMS() {
+            const phone = document.getElementById('patientSelect').value;
+            const message = document.getElementById('smsMessage').value;
+            
+            if (!message) {
+                alert('Please enter a message');
+                return;
+            }
+            
+            const resultDiv = document.getElementById('result');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '⏳ Processing...';
+            
+            // This would call the Africa's Talking API in production
+            // For demo, we simulate the response
+            setTimeout(() => {
+                resultDiv.innerHTML = `✅ SMS sent to ${phone}<br>Message: "${message}"<br><br>📱 System would process this through Africa's Talking API`;
+            }, 1000);
+        }
+    </script>
+</body>
+</html>

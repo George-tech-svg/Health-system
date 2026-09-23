@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AFYAHIV CARE | Register as Patient</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #1e8e3e 0%, #0d5e2a 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .container { max-width: 620px; width: 100%; background: white; border-radius: 20px; padding: 40px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+        h1 { text-align: center; margin-bottom: 6px; color: #1e8e3e; font-size: 26px; }
+        .subtitle { text-align: center; color: #666; margin-bottom: 30px; font-size: 14px; }
+        .section-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #1e8e3e; font-weight: 700; margin: 22px 0 10px; border-bottom: 2px solid #e8f5e9; padding-bottom: 6px; }
+        .form-group { margin-bottom: 16px; }
+        label { display: block; margin-bottom: 6px; color: #333; font-weight: 500; font-size: 13px; }
+        input, select { width: 100%; padding: 11px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; background: white; }
+        button { width: 100%; padding: 14px; background: #1e8e3e; color: white; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 20px; }
+        button:hover { background: #0d5e2a; }
+        .back-link { display: block; text-align: center; margin-top: 20px; color: #1e8e3e; text-decoration: none; font-size: 13px; }
+        .hint { font-size: 11px; color: #888; margin-top: 4px; }
+        .error-message { background: #ffebee; color: #c62828; padding: 14px; border-radius: 8px; margin-bottom: 20px; text-align: center; font-size: 13px; }
+        .success-message { background: #e8f5e9; color: #2e7d32; padding: 20px; border-radius: 8px; margin-bottom: 20px; text-align: center; font-size: 14px; }
+        .patient-id-box { background: #f5f5f5; padding: 18px; border-radius: 10px; text-align: center; margin: 18px 0; border: 2px dashed #1e8e3e; }
+        .patient-id-box strong { font-size: 24px; color: #1e8e3e; font-family: monospace; letter-spacing: 2px; }
+        .row { display: flex; gap: 14px; }
+        .row .form-group { flex: 1; }
+        @media (max-width: 600px) { .row { flex-direction: column; gap: 0; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>👤 Patient Registration</h1>
+        <p class="subtitle">Register to access emergency services from your nearest hospital</p>
+
+        {% if error %}
+        <div class="error-message">{{ error }}</div>
+        {% endif %}
+
+        {% if success %}
+        <div class="success-message">
+            ✅ Registration successful!<br>
+            Please save your Patient ID below.
+        </div>
+        <div class="patient-id-box">
+            <div style="font-size: 12px; color: #666; margin-bottom: 6px;">YOUR PATIENT ID</div>
+            <strong>{{ patient_id }}</strong>
+        </div>
+        <div style="text-align: center; font-size: 13px; color: #555; line-height: 1.7;">
+            Write this ID down. You'll need it together with your password to log in.<br>
+            You can now <a href="/" style="color: #1e8e3e; font-weight: 600;">go to login</a>.
+        </div>
+        {% else %}
+
+        <form method="POST" action="/patient/register">
+            <div class="section-label">Personal Information</div>
+            <div class="form-group">
+                <label>Full Name *</label>
+                <input type="text" name="full_name" required placeholder="e.g., Mary Atieno">
+            </div>
+
+            <div class="form-group">
+                <label>Phone Number *</label>
+                <input type="tel" name="phone_number" required placeholder="e.g., 0712345678 or +254712345678">
+                <div class="hint">This is how the hospital may reach you.</div>
+            </div>
+
+            <div class="form-group">
+                <label>Village / Location *</label>
+                <input type="text" name="location" required placeholder="e.g., Siaya Town">
+            </div>
+
+            <div class="section-label">Your Hospital</div>
+            <div class="form-group">
+                <label>Nearest Hospital *</label>
+                <select name="hospital_id" required>
+                    <option value="">-- Select Hospital --</option>
+                    {% for h in hospitals %}
+                    <option value="{{ h[0] }}">{{ h[1] }} ({{ h[3] if h[3] else h[2] }})</option>
+                    {% endfor %}
+                </select>
+                <div class="hint">Pick the hospital closest to you. Your emergency alerts will go to them.</div>
+            </div>
+
+            <div class="section-label">Login Credentials</div>
+            <div class="row">
+                <div class="form-group">
+                    <label>Password *</label>
+                    <input type="password" name="password" required minlength="4" placeholder="Minimum 4 characters">
+                </div>
+                <div class="form-group">
+                    <label>Confirm Password *</label>
+                    <input type="password" name="confirm_password" required minlength="4" placeholder="Repeat password">
+                </div>
+            </div>
+
+            <button type="submit">CREATE PATIENT ACCOUNT</button>
+        </form>
+
+        {% endif %}
+
+        <a href="/" class="back-link">← Back to Login</a>
+    </div>
+</body>
+</html>

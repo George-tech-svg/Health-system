@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AFYAHIV CARE | Register Patient</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #1e8e3e 0%, #0d5e2a 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .container { max-width: 600px; width: 100%; background: white; border-radius: 20px; padding: 40px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+        h1 { text-align: center; margin-bottom: 10px; color: #333; }
+        .subtitle { text-align: center; color: #666; margin-bottom: 30px; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; color: #333; font-weight: 500; }
+        input, select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
+        button { width: 100%; padding: 14px; background: #1e8e3e; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; margin-top: 10px; }
+        button:hover { background: #166534; }
+        .back-link { display: block; text-align: center; margin-top: 20px; color: #1e8e3e; text-decoration: none; }
+        .back-link:hover { text-decoration: underline; }
+        .password-hint { font-size: 11px; color: #666; margin-top: 5px; }
+        .error-message { background: #ffebee; color: #c62828; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center; }
+        .success-message { background: #e8f5e9; color: #1e8e3e; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center; }
+        .patient-id-box { background: #f5f5f5; padding: 15px; border-radius: 8px; text-align: center; margin: 20px 0; }
+        .patient-id-box strong { font-size: 24px; color: #1e8e3e; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>AFYAHIV CARE</h1>
+        <p class="subtitle">Register New Patient</p>
+        
+        <div id="errorMessage" class="error-message" style="display: none;"></div>
+        <div id="successMessage" class="success-message" style="display: none;"></div>
+        
+        <form id="registerForm">
+            <div class="form-group">
+                <label>Full Name *</label>
+                <input type="text" id="fullName" required placeholder="e.g., Mary Atieno">
+            </div>
+            <div class="form-group">
+                <label>Phone Number *</label>
+                <input type="tel" id="phoneNumber" required placeholder="0712345678 or +254712345678">
+            </div>
+            <div class="form-group">
+                <label>Password *</label>
+                <input type="password" id="password" required placeholder="Create password (minimum 4 characters)">
+                <div class="password-hint">Patient will need this to login</div>
+            </div>
+            <div class="form-group">
+                <label>Confirm Password *</label>
+                <input type="password" id="confirmPassword" required placeholder="Confirm password">
+            </div>
+            <div class="form-group">
+                <label>Location / Village *</label>
+                <input type="text" id="location" required placeholder="e.g., Siaya Town, Bondo, Kisumu, Rangala, Ugunja">
+            </div>
+            <div class="form-group">
+                <label>ARV Regimen</label>
+                <select id="arvRegimen">
+                    <option value="TLD">TLD (Tenofovir/Lamivudine/Dolutegravir)</option>
+                    <option value="TLE">TLE (Tenofovir/Lamivudine/Efavirenz)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Default Medication Time</label>
+                <input type="time" id="medicationTime" value="20:00" required>
+                <div class="password-hint">Patient will receive reminder at this time</div>
+            </div>
+            <button type="submit">Register Patient</button>
+        </form>
+        <a href="/doctor/dashboard" class="back-link">← Back to Doctor Dashboard</a>
+    </div>
+
+    <script>
+        document.getElementById('registerForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const fullName = document.getElementById('fullName').value.trim();
+            const phoneNumber = document.getElementById('phoneNumber').value.trim();
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            const location = document.getElementById('location').value.trim();
+            const arvRegimen = document.getElementById('arvRegimen').value;
+            const medicationTime = document.getElementById('medicationTime').value;
+            
+            const errorDiv = document.getElementById('errorMessage');
+            const successDiv = document.getElementById('successMessage');
+            
+            errorDiv.style.display = 'none';
+            successDiv.style.display = 'none';
+            
+            if (!fullName) {
+                errorDiv.innerHTML = 'Please enter patient full name';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            
+            if (!phoneNumber) {
+                errorDiv.innerHTML = 'Please enter phone number';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            
+            if (password.length < 4) {
+                errorDiv.innerHTML = 'Password must be at least 4 characters';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            
+            if (password !== confirmPassword) {
+                errorDiv.innerHTML = 'Passwords do not match';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            
+            if (!location) {
+                errorDiv.innerHTML = 'Please enter location';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('full_name', fullName);
+            formData.append('phone_number', phoneNumber);
+            formData.append('password', password);
+            formData.append('confirm_password', confirmPassword);
+            formData.append('location', location);
+            formData.append('arv_regimen', arvRegimen);
+            formData.append('medication_time', medicationTime);
+            
+            try {
+                const response = await fetch('/doctor/register_patient', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    successDiv.innerHTML = '✅ Patient registered successfully!<br><br>Patient ID: <strong>' + result.patient_id + '</strong><br><br>Please provide this ID and the password to the patient.';
+                    successDiv.style.display = 'block';
+                    document.getElementById('registerForm').reset();
+                    document.getElementById('medicationTime').value = '20:00';
+                    
+                    // Clear form after 3 seconds and redirect
+                    setTimeout(() => {
+                        window.location.href = '/doctor/dashboard';
+                    }, 3000);
+                } else {
+                    errorDiv.innerHTML = result.error || 'Registration failed. Please try again.';
+                    errorDiv.style.display = 'block';
+                }
+            } catch (error) {
+                errorDiv.innerHTML = 'Network error. Please try again.';
+                errorDiv.style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AFYAHIV CARE - Voice Call Simulator</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e8e3e 0%, #0d5e2a 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            width: 100%;
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 { text-align: center; margin-bottom: 10px; color: #333; }
+        .subtitle { text-align: center; color: #666; margin-bottom: 30px; }
+        .phone-icon { font-size: 80px; text-align: center; margin: 20px 0; }
+        .call-status {
+            background: #f5f5f5;
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .recording {
+            animation: pulse 1s infinite;
+            color: #f44336;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        select, textarea {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        button {
+            width: 100%;
+            padding: 14px;
+            background: #1e8e3e;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+        }
+        .back-link {
+            display: block;
+            text-align: center;
+            margin-top: 20px;
+            color: #1e8e3e;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📞 AFYAHIV CARE</h1>
+        <p class="subtitle">Voice Call Simulator (Africa's Talking)</p>
+        
+        <div class="phone-icon">📱</div>
+        
+        <div class="call-status" id="callStatus">
+            <p>Click below to simulate a voice call to <strong>344</strong></p>
+        </div>
+        
+        <select id="patientSelect">
+            {% for patient in patients %}
+            <option value="{{ patient.phone }}">{{ patient.name }} ({{ patient.phone }}) - {{ patient.language }}</option>
+            {% endfor %}
+        </select>
+        
+        <textarea id="spokenMessage" rows="4" placeholder="What will the patient say? (Simulated voice message)&#10;&#10;Examples:&#10;• &quot;Nina homa na kichwa kinaniuma&quot;&#10;• &quot;I have fever and headache&quot;&#10;• &quot;Nina damu na maumivu makali&quot;"></textarea>
+        
+        <button onclick="simulateVoiceCall()">📞 Dial 344 (Start Voice Call)</button>
+        
+        <div id="result" class="result"></div>
+        
+        <a href="/doctor/dashboard" class="back-link">← Back to Doctor Dashboard</a>
+    </div>
+    
+    <script>
+        async function simulateVoiceCall() {
+            const patientPhone = document.getElementById('patientSelect').value;
+            const spokenMessage = document.getElementById('spokenMessage').value;
+            const callStatus = document.getElementById('callStatus');
+            const resultDiv = document.getElementById('result');
+            
+            if (!spokenMessage.trim()) {
+                alert('Please enter what the patient will say');
+                return;
+            }
+            
+            // Simulate call flow
+            callStatus.innerHTML = `
+                <p>📞 <strong>Calling 344...</strong></p>
+                <p>🎙️ <strong>Africa's Talking answers:</strong> "Welcome to AFYAHIV CARE. Please speak after the beep."</p>
+                <p>🔴 <strong class="recording">Recording... (BEEP)</strong></p>
+                <p>🎤 <strong>Patient says:</strong> "${spokenMessage}"</p>
+                <p>📡 <strong>Sending recording to callback URL...</strong></p>
+            `;
+            
+            try {
+                const formData = new FormData();
+                formData.append('patient_phone', patientPhone);
+                formData.append('spoken_message', spokenMessage);
+                
+                const response = await fetch('/simulate/voice_call', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'processed') {
+                    callStatus.innerHTML = `
+                        <p>✅ <strong>Call completed successfully!</strong></p>
+                        <p>🤖 <strong>AI Analysis:</strong> Risk Level: ${result.analysis.risk_level.toUpperCase()}</p>
+                        <p>📝 <strong>Transcribed Text:</strong> "${result.transcription}"</p>
+                        <p>📱 <strong>Response SMS sent to patient</strong></p>
+                    `;
+                    
+                    resultDiv.style.display = 'block';
+                    resultDiv.style.background = '#e8f5e9';
+                    resultDiv.style.color = '#1e8e3e';
+                    resultDiv.innerHTML = `
+                        <strong>✅ Voice Call Processed!</strong><br><br>
+                        <strong>Patient:</strong> ${result.patient}<br>
+                        <strong>Message:</strong> ${result.message}<br>
+                        <strong>AI Response:</strong> ${result.analysis.response}<br><br>
+                        <strong>📋 This voice report has been added to the Doctor Dashboard!</strong>
+                    `;
+                    
+                    // Refresh doctor dashboard after 2 seconds
+                    setTimeout(() => {
+                        window.location.href = '/doctor/dashboard';
+                    }, 3000);
+                }
+            } catch (error) {
+                resultDiv.style.display = 'block';
+                resultDiv.style.background = '#ffebee';
+                resultDiv.style.color = '#c62828';
+                resultDiv.innerHTML = '❌ Error processing voice call. Please try again.';
+            }
+        }
+    </script>
+</body>
+</html>

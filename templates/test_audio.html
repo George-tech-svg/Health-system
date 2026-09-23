@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Audio Reply</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; }
+        .modal-content { background: white; margin: 10% auto; padding: 20px; width: 400px; border-radius: 10px; }
+        .recording { background: #ffebee; padding: 10px; margin: 10px 0; }
+        .transcribed { background: #e8f5e9; padding: 10px; margin: 10px 0; }
+        .preview { background: #f0f0f0; padding: 10px; margin: 10px 0; }
+        .btn-group { display: flex; gap: 10px; margin-top: 15px; }
+        .btn-red { background: #f44336; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; }
+        .btn-orange { background: #ff9800; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; }
+        .btn-blue { background: #2196F3; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; }
+        .btn-gray { background: #9CA3AF; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; }
+        audio { width: 100%; }
+    </style>
+</head>
+<body>
+    <h1>Test Audio Reply</h1>
+    <p>Patient ID: <span id="patientId">HIVA0D1F</span></p>
+    <button onclick="openAudioModal()">Record Audio Reply</button>
+    
+    <div id="audioModal" class="modal">
+        <div class="modal-content">
+            <h3>Record Audio Reply</h3>
+            <button id="recordBtn" class="btn-red" onclick="startRecording()">START RECORDING</button>
+            <button id="stopBtn" class="btn-orange" onclick="stopRecording()" style="display:none">STOP RECORDING</button>
+            <div id="recordingDiv" class="recording" style="display:none">🔴 RECORDING... Speak now</div>
+            <div id="transcribedDiv" class="transcribed" style="display:none"><strong>Transcribed:</strong><br><span id="transcribedText"></span></div>
+            <div id="previewDiv" class="preview" style="display:none"><strong>Preview:</strong><br><audio id="audioPreview" controls></audio></div>
+            <div id="actionDiv" class="btn-group" style="display:none">
+                <button class="btn-red" onclick="deleteRecording()">DELETE</button>
+                <button class="btn-orange" onclick="rerecord()">RE-RECORD</button>
+                <button class="btn-blue" onclick="sendRecording()">SEND</button>
+                <button class="btn-gray" onclick="closeModal()">CANCEL</button>
+            </div>
+            <div id="processingDiv" style="display:none; text-align:center; padding:20px;">Sending...</div>
+            <div id="successDiv" style="display:none; background:#e8f5e9; padding:15px; text-align:center; margin-top:15px;">✅ Sent to patient!</div>
+        </div>
+    </div>
+    
+    <script>
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let audioBlob = null;
+        let transcribedText = '';
+        let recognition = null;
+        let patientId = document.getElementById('patientId').innerText;
+        
+        function openAudioModal() {
+            document.getElementById('audioModal').style.display = 'block';
+            resetModal();
+        }
+        
+        function closeModal() {
+            document.getElementById('audioModal').style.display = 'none';
+            resetModal();
+        }
+        
+        function resetModal() {
+            if (mediaRecorder) mediaRecorder.stop();
+            audioBlob = null;
+            transcribedText = '';
+            document.getElementById('recordBtn').style.display = 'block';
+            document.getElementById('stopBtn').style.display = 'none';
+            document.getElementById('recordingDiv').style.display = 'none';
+            document.getElementById('transcribedDiv').style.display = 'none';
+            document.getElementById('previewDiv').style.display = 'none';
+            document.getElementById('actionDiv').style.display = 'none';
+            document.getElementById('processingDiv').style.display = 'none';
+            document.getElementById('successDiv').style.display = 'none';
+            document.getElementById('transcribedText').innerHTML = '';
+            document.getElementById('audioPreview').src = '';
+        }
+        
+        function startRecording() {
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
+                    mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+                    mediaRecorder.onstop = () => {
+                        audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                        document.getElementById('audioPreview').src = URL.createObjectURL(audioBlob);
+                        document.getElementById('previewDiv').style.display = 'block';
+                        stream.getTracks().forEach(t => t.stop());
+                        startRecognition();
+                        document.getElementById('actionDiv').style.display = 'flex';
+                    };
+                    mediaRecorder.start();
+                    document.getElementById('recordBtn').style.display = 'none';
+                    document.getElementById('stopBtn').style.display = 'block';
+                    document.getElementById('recordingDiv').style.display = 'block';
+                })
+                .catch(e => alert('Microphone error: ' + e.message));
+        }
+        
+        function stopRecording() {
+            if (mediaRecorder) mediaRecorder.stop();
+            document.getElementById('stopBtn').style.display = 'none';
+            document.getElementById('recordingDiv').style.display = 'none';
+        }
+        
+        function startRecognition() {
+            const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SR) {
+                document.getElementById('transcribedText').innerHTML = 'Speech not supported';
+                document.getElementById('transcribedDiv').style.display = 'block';
+                return;
+            }
+            recognition = new SR();
+            recognition.lang = 'en-US';
+            recognition.continuous = true;
+            let final = '';
+            recognition.onresult = e => {
+                for (let i = e.resultIndex; i < e.results.length; i++)
+                    if (e.results[i].isFinal) final += e.results[i][0].transcript;
+                document.getElementById('transcribedText').innerHTML = final;
+                transcribedText = final;
+                document.getElementById('transcribedDiv').style.display = 'block';
+            };
+            recognition.start();
+            setTimeout(() => { if (recognition) recognition.stop(); }, 30000);
+        }
+        
+        function deleteRecording() { resetModal(); }
+        function rerecord() { deleteRecording(); startRecording(); }
+        
+        async function sendRecording() {
+            if (!audioBlob) {
+                alert('No recording to send');
+                return;
+            }
+            const fd = new FormData();
+            fd.append('patient_id', patientId);
+            fd.append('reply_text', transcribedText || 'Voice message');
+            fd.append('audio', audioBlob, 'voice.webm');
+            document.getElementById('actionDiv').style.display = 'none';
+            document.getElementById('processingDiv').style.display = 'block';
+            try {
+                const r = await fetch('/doctor/send_voice_reply', { method: 'POST', body: fd });
+                const result = await r.json();
+                if (result.status === 'success') {
+                    document.getElementById('processingDiv').style.display = 'none';
+                    document.getElementById('successDiv').style.display = 'block';
+                    setTimeout(() => closeModal(), 2000);
+                } else {
+                    alert('Error: ' + (result.error || 'Unknown'));
+                    document.getElementById('processingDiv').style.display = 'none';
+                    document.getElementById('actionDiv').style.display = 'flex';
+                }
+            } catch(e) {
+                alert('Network error: ' + e.message);
+                document.getElementById('processingDiv').style.display = 'none';
+                document.getElementById('actionDiv').style.display = 'flex';
+            }
+        }
+    </script>
+</body>
+</html>

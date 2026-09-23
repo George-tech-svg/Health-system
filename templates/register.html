@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AFYAHIV CARE | Register Patient</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #1e8e3e 0%, #0d5e2a 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .container { max-width: 600px; width: 100%; background: white; border-radius: 20px; padding: 40px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+        h1 { text-align: center; margin-bottom: 10px; color: #333; }
+        .subtitle { text-align: center; color: #666; margin-bottom: 30px; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; color: #333; font-weight: 500; }
+        input, select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; }
+        button { width: 100%; padding: 14px; background: #1e8e3e; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; margin-top: 10px; }
+        .success-message { background: #e8f5e9; color: #1e8e3e; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center; }
+        .patient-id-box { background: #f5f5f5; padding: 15px; border-radius: 8px; text-align: center; margin: 20px 0; }
+        .patient-id-box strong { font-size: 24px; color: #1e8e3e; }
+        .back-link { display: block; text-align: center; margin-top: 20px; color: #1e8e3e; text-decoration: none; }
+        .password-hint { font-size: 11px; color: #666; margin-top: 5px; }
+        .error-message { background: #ffebee; color: #c62828; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>AFYAHIV CARE</h1>
+        <p class="subtitle">Patient Registration (By Doctor)</p>
+        
+        {% if success %}
+        <div class="success-message">Patient registered successfully!</div>
+        <div class="patient-id-box">
+            <div>Patient ID:</div>
+            <strong>{{ patient_id }}</strong>
+            <div style="margin-top: 10px; font-size: 12px;">Please provide this ID and the password to the patient</div>
+        </div>
+        <a href="/doctor/dashboard" class="back-link">Back to Doctor Dashboard</a>
+        
+        {% elif error %}
+        <div class="error-message">{{ error }}</div>
+        <form method="POST" action="/doctor/register_patient">
+            <div class="form-group">
+                <label>Full Name</label>
+                <input type="text" name="full_name" required placeholder="e.g., Mary Atieno">
+            </div>
+            <div class="form-group">
+                <label>Phone Number</label>
+                <input type="tel" name="phone_number" required placeholder="+254712345678">
+            </div>
+            <div class="form-group">
+                <label>Password (Patient will use to login)</label>
+                <input type="password" name="password" required placeholder="Create a password (minimum 4 characters)">
+                <div class="password-hint">Patient needs this password + Patient ID to login</div>
+            </div>
+            <div class="form-group">
+                <label>Confirm Password</label>
+                <input type="password" name="confirm_password" required placeholder="Confirm the password">
+            </div>
+            <div class="form-group">
+                <label>Location / Village</label>
+                <input type="text" name="location" required placeholder="e.g., Siaya Town">
+            </div>
+            <div class="form-group">
+                <label>ARV Regimen</label>
+                <select name="arv_regimen">
+                    <option value="TLD">TLD (Tenofovir/Lamivudine/Dolutegravir)</option>
+                    <option value="TLE">TLE (Tenofovir/Lamivudine/Efavirenz)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Medication Time</label>
+                <input type="time" name="medication_time" value="20:00" required>
+            </div>
+            <button type="submit">Register Patient</button>
+        </form>
+        <a href="/doctor/dashboard" class="back-link">Back to Doctor Dashboard</a>
+        
+        {% else %}
+        <form method="POST" action="/doctor/register_patient">
+            <div class="form-group">
+                <label>Full Name</label>
+                <input type="text" name="full_name" required placeholder="e.g., Mary Atieno">
+            </div>
+            <div class="form-group">
+                <label>Phone Number</label>
+                <input type="tel" name="phone_number" required placeholder="+254712345678">
+            </div>
+            <div class="form-group">
+                <label>Password (Patient will use to login)</label>
+                <input type="password" name="password" required placeholder="Create a password (minimum 4 characters)">
+                <div class="password-hint">Patient needs this password + Patient ID to login</div>
+            </div>
+            <div class="form-group">
+                <label>Confirm Password</label>
+                <input type="password" name="confirm_password" required placeholder="Confirm the password">
+            </div>
+            <div class="form-group">
+                <label>Location / Village</label>
+                <input type="text" name="location" required placeholder="e.g., Siaya Town">
+            </div>
+            <div class="form-group">
+                <label>ARV Regimen</label>
+                <select name="arv_regimen">
+                    <option value="TLD">TLD (Tenofovir/Lamivudine/Dolutegravir)</option>
+                    <option value="TLE">TLE (Tenofovir/Lamivudine/Efavirenz)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Medication Time</label>
+                <input type="time" name="medication_time" value="20:00" required>
+            </div>
+            <button type="submit">Register Patient</button>
+        </form>
+        <a href="/doctor/dashboard" class="back-link">Back to Doctor Dashboard</a>
+        {% endif %}
+    </div>
+</body>
+</html>

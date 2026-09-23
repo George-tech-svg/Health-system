@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AFYAHIV CARE - USSD Simulator</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: linear-gradient(135deg, #1e8e3e 0%, #0d5e2a 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            font-family: 'Courier New', monospace;
+        }
+        .container {
+            max-width: 450px;
+            width: 100%;
+        }
+        .phone {
+            background: #111;
+            border-radius: 30px;
+            padding: 20px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+        .screen {
+            background: #0a3d1a;
+            border-radius: 20px;
+            padding: 20px;
+            min-height: 480px;
+        }
+        .response {
+            background: #1e8e3e;
+            padding: 15px;
+            border-radius: 12px;
+            color: white;
+            white-space: pre-wrap;
+            font-size: 14px;
+            min-height: 220px;
+            margin-bottom: 15px;
+            font-family: 'Courier New', monospace;
+            line-height: 1.5;
+            overflow-y: auto;
+        }
+        .input-area {
+            margin-bottom: 15px;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            background: #2d2d2d;
+            border: none;
+            color: #00ff00;
+            font-size: 16px;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            text-align: center;
+        }
+        input:focus {
+            outline: none;
+            background: #3d3d3d;
+        }
+        .keys {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+        .key {
+            background: #2d2d2d;
+            color: white;
+            border: none;
+            padding: 14px;
+            font-size: 18px;
+            border-radius: 10px;
+            cursor: pointer;
+            text-align: center;
+            font-weight: bold;
+        }
+        .key:hover { background: #1e8e3e; }
+        .key-special { background: #dc3545; }
+        .key-special:hover { background: #c82333; }
+        .call-btn {
+            background: #1e8e3e;
+            color: white;
+            border: none;
+            padding: 14px;
+            width: 100%;
+            font-size: 16px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        .reset-btn {
+            background: #ff9800;
+            color: white;
+            border: none;
+            padding: 8px;
+            width: 100%;
+            border-radius: 10px;
+            cursor: pointer;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        .info {
+            background: #1a1a2e;
+            padding: 12px;
+            font-size: 11px;
+            text-align: center;
+            margin-top: 10px;
+            border-radius: 10px;
+            color: #aaa;
+        }
+        .status {
+            font-size: 10px;
+            color: #ff6600;
+            margin-top: 5px;
+            text-align: center;
+        }
+        .title {
+            text-align: center;
+            color: #ff6600;
+            margin-bottom: 10px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="phone">
+        <div class="title">AFRICA'S TALKING USSD | *384*1234#</div>
+        <button class="reset-btn" onclick="resetSession()">RESET SESSION</button>
+        
+        <div class="screen">
+            <div class="response" id="response">Dial *384*1234# to start USSD</div>
+            <div class="input-area">
+                <input type="text" id="input" placeholder="Type response..." onkeypress="if(event.key==='Enter') send()">
+            </div>
+            <div class="keys">
+                <div class="key" onclick="add('1')">1</div>
+                <div class="key" onclick="add('2')">2</div>
+                <div class="key" onclick="add('3')">3</div>
+                <div class="key" onclick="add('4')">4</div>
+                <div class="key" onclick="add('5')">5</div>
+                <div class="key" onclick="add('6')">6</div>
+                <div class="key" onclick="add('7')">7</div>
+                <div class="key" onclick="add('8')">8</div>
+                <div class="key" onclick="add('9')">9</div>
+                <div class="key" onclick="add('*')">*</div>
+                <div class="key" onclick="add('0')">0</div>
+                <div class="key" onclick="add('#')">#</div>
+                <div class="key key-special" onclick="del()">DEL</div>
+                <div class="key key-special" onclick="clearInput()">CLR</div>
+                <div class="key" onclick="send()">SEND</div>
+            </div>
+            <button class="call-btn" onclick="startUSSD()">DIAL *384*1234#</button>
+        </div>
+        <div class="info">
+            <strong>USSD MENU GUIDE:</strong><br>
+            1. Report health<br>
+            2. My medication<br>
+            3. Find hospital<br>
+            4. My stats<br>
+            0. Exit
+        </div>
+        <div class="status" id="status">Ready. Click DIAL to start</div>
+    </div>
+</div>
+
+<script>
+let currentInput = "";
+let sessionActive = false;
+
+function startUSSD() {
+    currentInput = "";
+    sessionActive = true;
+    document.getElementById('status').innerHTML = "Calling *384*1234#...";
+    document.getElementById('response').innerHTML = "Connecting...";
+    sendRequest("");
+}
+
+function add(char) {
+    document.getElementById('input').value += char;
+}
+
+function del() {
+    let inp = document.getElementById('input');
+    inp.value = inp.value.slice(0, -1);
+}
+
+function clearInput() {
+    document.getElementById('input').value = "";
+}
+
+function send() {
+    let val = document.getElementById('input').value;
+    if (!val && !sessionActive) {
+        startUSSD();
+        return;
+    }
+    let newText = currentInput ? currentInput + "*" + val : val;
+    sendRequest(newText);
+    document.getElementById('input').value = "";
+}
+
+async function sendRequest(text) {
+    let formData = new FormData();
+    formData.append('phone_number', '');
+    formData.append('ussd_input', text);
+    
+    document.getElementById('status').innerHTML = `Sending: "${text}"`;
+    
+    try {
+        let response = await fetch('/ussd/simulate', {
+            method: 'POST',
+            body: formData
+        });
+        
+        let result = await response.text();
+        
+        let displayText = result;
+        displayText = displayText.replace(/CON /g, '');
+        displayText = displayText.replace(/END /g, '');
+        displayText = displayText.replace(/\n/g, '<br>');
+        
+        document.getElementById('response').innerHTML = displayText;
+        document.getElementById('status').innerHTML = `Response received`;
+        
+        if (result.startsWith('END')) {
+            sessionActive = false;
+            currentInput = "";
+            document.getElementById('status').innerHTML = `Session ended. Dial again to start.`;
+        } else {
+            sessionActive = true;
+            currentInput = text;
+        }
+    } catch (error) {
+        document.getElementById('response').innerHTML = `Error: ${error.message}`;
+        document.getElementById('status').innerHTML = `Connection failed`;
+    }
+}
+
+function resetSession() {
+    currentInput = "";
+    sessionActive = false;
+    document.getElementById('input').value = "";
+    document.getElementById('response').innerHTML = "Session reset. Click DIAL to start new USSD session.";
+    document.getElementById('status').innerHTML = "Ready. Click DIAL to start";
+}
+</script>
+</body>
+</html>

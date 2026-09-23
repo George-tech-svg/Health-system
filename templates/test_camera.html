@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Camera Test</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        button { padding: 15px 30px; font-size: 18px; margin: 10px; cursor: pointer; background: #4caf50; color: white; border: none; border-radius: 8px; }
+        video { width: 100%; max-width: 600px; margin-top: 20px; border: 2px solid #ccc; border-radius: 10px; background: #000; }
+        .log { background: #f0f0f0; padding: 15px; border-radius: 8px; margin-top: 20px; font-family: monospace; white-space: pre-wrap; max-height: 300px; overflow-y: auto; }
+        .success { color: green; font-weight: bold; }
+        .error { color: red; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>📹 Camera Test Page</h1>
+    <p>This page tests if your browser can access the camera.</p>
+    
+    <button id="testBtn">🎥 TEST CAMERA</button>
+    <button onclick="location.reload()">🔄 REFRESH PAGE</button>
+    
+    <video id="testVideo" autoplay muted playsinline></video>
+    
+    <div class="log" id="log"></div>
+
+    <script>
+        const logDiv = document.getElementById('log');
+        
+        function log(msg, isError = false) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.innerHTML = `[${timestamp}] ${msg}`;
+            if (isError) logEntry.style.color = 'red';
+            else logEntry.style.color = 'green';
+            logDiv.appendChild(logEntry);
+            console.log(msg);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        log('✅ Page loaded successfully');
+        log(`📍 Current URL: ${window.location.href}`);
+        log(`🔒 Protocol: ${window.location.protocol}`);
+        log(`🌐 User Agent: ${navigator.userAgent.substring(0, 100)}...`);
+
+        document.getElementById('testBtn').onclick = async function() {
+            log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            log('📹 Button clicked - requesting camera access...');
+            
+            // Check if browser supports getUserMedia
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                log('❌ ERROR: getUserMedia not supported by this browser', true);
+                log('💡 Solution: Use Chrome, Edge, or Safari browser', true);
+                return;
+            }
+            
+            try {
+                log('📷 Calling getUserMedia with video and audio...');
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: true, 
+                    audio: true 
+                });
+                
+                log('✅ SUCCESS! Camera access GRANTED!', false);
+                log(`📊 Stream active: ${stream.active}`);
+                log(`🎥 Video tracks: ${stream.getVideoTracks().length}`);
+                log(`🎤 Audio tracks: ${stream.getAudioTracks().length}`);
+                
+                if (stream.getVideoTracks().length > 0) {
+                    const videoTrack = stream.getVideoTracks()[0];
+                    log(`📹 Camera label: ${videoTrack.label}`);
+                    log(`🔧 Camera settings: ${JSON.stringify(videoTrack.getSettings(), null, 2)}`);
+                }
+                
+                const video = document.getElementById('testVideo');
+                video.srcObject = stream;
+                video.play();
+                log('🎬 Video preview started - you should see yourself!');
+                
+            } catch(err) {
+                log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', true);
+                log(`❌ ERROR: ${err.name}`, true);
+                log(`📝 Message: ${err.message}`, true);
+                
+                if(err.name === 'NotAllowedError') {
+                    log('💡 SOLUTION: Click the camera icon in the browser address bar and ALLOW camera access, then refresh and try again.', true);
+                    log('💡 On Chrome: Look for the camera icon at the right end of the address bar', true);
+                    log('💡 On Edge: Click the lock icon next to the URL and allow camera', true);
+                } else if(err.name === 'NotFoundError') {
+                    log('💡 SOLUTION: No camera found on your device. Connect a camera and try again.', true);
+                } else if(err.name === 'NotReadableError') {
+                    log('💡 SOLUTION: Camera is being used by another application. Close Zoom, Skype, or other camera apps.', true);
+                } else if(err.name === 'SecurityError') {
+                    log('💡 SOLUTION: Camera access blocked by security settings. Use http://localhost (not file://)', true);
+                } else if(err.name === 'AbortError') {
+                    log('💡 SOLUTION: User cancelled the permission prompt. Click the button again.', true);
+                } else {
+                    log(`💡 Check browser settings: chrome://settings/content/camera`, true);
+                }
+            }
+        };
+        
+        // Check if camera was already granted
+        navigator.permissions.query({ name: 'camera' }).then(result => {
+            if (result.state === 'granted') {
+                log('ℹ️ Camera permission was already GRANTED by this site');
+            } else if (result.state === 'denied') {
+                log('⚠️ Camera permission was DENIED for this site. Click the camera icon in address bar to allow.', true);
+            } else {
+                log('ℹ️ Camera permission state: prompt (will ask when you click the button)');
+            }
+        }).catch(e => log(`Permission query error: ${e.message}`));
+    </script>
+</body>
+</html>

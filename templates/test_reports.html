@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Reports</title>
+    <style>
+        body { font-family: monospace; padding: 20px; }
+        pre { background: #f0f0f0; padding: 15px; border-radius: 5px; overflow-x: auto; }
+        .message { border: 1px solid #ccc; margin: 10px 0; padding: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Test Reports Data</h1>
+    
+    <h2>Number of messages: {{ all_messages|length }}</h2>
+    
+    {% if all_messages|length > 0 %}
+        {% for msg in all_messages %}
+        <div class="message">
+            <strong>Message {{ loop.index }}:</strong><br>
+            - msg[0] (id): {{ msg[0] }}<br>
+            - msg[1] (patient_id): {{ msg[1] }}<br>
+            - msg[2] (direction): {{ msg[2] }}<br>
+            - msg[3] (type): {{ msg[3] }}<br>
+            - msg[4] (content): {{ msg[4] }}<br>
+            - msg[5] (language): {{ msg[5] }}<br>
+            - msg[6] (risk_level): {{ msg[6] }}<br>
+            - msg[7] (symptoms): {{ msg[7] }}<br>
+            - msg[8] (response): {{ msg[8] }}<br>
+            - msg[9] (timestamp): {{ msg[9] }}<br>
+            - msg[10] (is_read): {{ msg[10] }}<br>
+            - msg[11] (is_emergency): {{ msg[11] }}<br>
+            - msg[12] (patient_name): {{ msg[12] }}<br>
+            - msg[13] (phone_number): {{ msg[13] }}<br>
+            - msg[14] (location): {{ msg[14] }}<br>
+            - msg[15] (audio_file): <strong style="color: red;">{{ msg[15] }}</strong><br>
+        </div>
+        {% endfor %}
+    {% else %}
+        <p>No messages found</p>
+    {% endif %}
+</body>
+</html>

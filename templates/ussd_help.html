@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AFYAHIV CARE - USSD Help</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e8e3e 0%, #0d5e2a 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 { color: #1e8e3e; margin-bottom: 20px; }
+        h2 { color: #333; margin: 20px 0 10px; border-bottom: 2px solid #1e8e3e; padding-bottom: 5px; }
+        .ussd-code {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 10px;
+            font-family: monospace;
+            font-size: 24px;
+            text-align: center;
+            margin: 20px 0;
+            color: #1e8e3e;
+        }
+        .menu-item {
+            background: #f8f9fa;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 8px;
+        }
+        .menu-number {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            background: #1e8e3e;
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 30px;
+            margin-right: 10px;
+        }
+        .example {
+            background: #e3f2fd;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-style: italic;
+        }
+        .back-btn {
+            display: inline-block;
+            background: #1e8e3e;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📱 AFYAHIV CARE - USSD Guide</h1>
+        <p>Works on ANY mobile phone - no smartphone or internet required!</p>
+        
+        <div class="ussd-code">
+            Dial: <strong>*384*1234#</strong>
+        </div>
+        
+        <h2>📋 Main Menu (Registered Patients)</h2>
+        
+        <div class="menu-item">
+            <span class="menu-number">1</span> Report your health
+        </div>
+        <div class="example">
+            Example: Type "Nina homa na kichwa" or "I have fever and headache"
+        </div>
+        
+        <div class="menu-item">
+            <span class="menu-number">2</span> Check medication reminder
+        </div>
+        <div class="example">
+            Shows your medication time and regimen
+        </div>
+        
+        <div class="menu-item">
+            <span class="menu-number">3</span> Find nearest hospital
+        </div>
+        <div class="example">
+            Get directions to the closest health facility
+        </div>
+        
+        <div class="menu-item">
+            <span class="menu-number">4</span> Change language
+        </div>
+        <div class="example">
+            Switch between English and Kiswahili
+        </div>
+        
+        <div class="menu-item">
+            <span class="menu-number">0</span> Exit
+        </div>
+        
+        <h2>🆕 New User Registration</h2>
+        <div class="menu-item">
+            Dial <strong>*384*1234#</strong> and follow prompts to register
+        </div>
+        <div class="example">
+            You'll need: Full name, Location, Language preference
+        </div>
+        
+        <h2>💡 How It Works</h2>
+        <ol style="margin-left: 20px; line-height: 1.8;">
+            <li>Dial <strong>*384*1234#</strong> on any phone</li>
+            <li>Follow the on-screen menu</li>
+            <li>Type your response and press Send</li>
+            <li>Your report is sent to your doctor instantly!</li>
+            <li>AI analyzes your message for emergencies</li>
+            <li>Doctor receives alert on their dashboard</li>
+        </ol>
+        
+        <h2>🌍 Supported Languages</h2>
+        <ul style="margin-left: 20px; line-height: 1.8;">
+            <li>🇬🇧 English</li>
+            <li>🇰🇪 Kiswahili</li>
+        </ul>
+        
+        <a href="/doctor/dashboard" class="back-btn">← Back to Dashboard</a>
+    </div>
+</body>
+</html>

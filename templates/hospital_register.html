@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AFYAHIV CARE | Register Hospital</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #1565C0 0%, #0D47A1 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .container { max-width: 640px; width: 100%; background: white; border-radius: 20px; padding: 40px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+        h1 { text-align: center; margin-bottom: 6px; color: #0D47A1; font-size: 26px; }
+        .subtitle { text-align: center; color: #666; margin-bottom: 30px; font-size: 14px; }
+        .section-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #1565C0; font-weight: 700; margin: 22px 0 10px; border-bottom: 2px solid #e3f2fd; padding-bottom: 6px; }
+        .form-group { margin-bottom: 16px; }
+        label { display: block; margin-bottom: 6px; color: #333; font-weight: 500; font-size: 13px; }
+        input, select { width: 100%; padding: 11px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; background: white; }
+        button { width: 100%; padding: 14px; background: #1565C0; color: white; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 20px; }
+        button:hover { background: #0D47A1; }
+        .back-link { display: block; text-align: center; margin-top: 20px; color: #1565C0; text-decoration: none; font-size: 13px; }
+        .hint { font-size: 11px; color: #888; margin-top: 4px; }
+        .error-message { background: #ffebee; color: #c62828; padding: 14px; border-radius: 8px; margin-bottom: 20px; text-align: center; font-size: 13px; }
+        .success-message { background: #e8f5e9; color: #2e7d32; padding: 18px; border-radius: 8px; margin-bottom: 20px; text-align: center; font-size: 14px; }
+        .row { display: flex; gap: 14px; }
+        .row .form-group { flex: 1; }
+        @media (max-width: 600px) { .row { flex-direction: column; gap: 0; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏥 Register Hospital</h1>
+        <p class="subtitle">Join AFYAHIV CARE and start monitoring your patients</p>
+
+        {% if error %}
+        <div class="error-message">{{ error }}</div>
+        {% endif %}
+        {% if success %}
+        <div class="success-message">
+            ✅ Hospital registered successfully!<br>
+            Your username: <strong>{{ username }}</strong><br><br>
+            <a href="/" style="color: #1565C0; text-decoration: underline;">Click here to login</a>
+        </div>
+        {% else %}
+
+        <form method="POST" action="/hospital/register">
+            <div class="section-label">Hospital Information</div>
+            <div class="form-group">
+                <label>Hospital Name *</label>
+                <input type="text" name="name" required placeholder="e.g., Siaya County Referral Hospital">
+            </div>
+
+            <div class="row">
+                <div class="form-group">
+                    <label>County *</label>
+                    <input type="text" name="county" required placeholder="e.g., Siaya">
+                </div>
+                <div class="form-group">
+                    <label>Sub-County *</label>
+                    <input type="text" name="sub_county" required placeholder="e.g., Siaya Town">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Village / Town *</label>
+                <input type="text" name="village" required placeholder="e.g., Siaya Town">
+            </div>
+
+            <div class="form-group">
+                <label>Physical Address</label>
+                <input type="text" name="address" placeholder="e.g., Along Kisumu Road, near Police Station">
+            </div>
+
+            <div class="form-group">
+                <label>Hospital Phone</label>
+                <input type="tel" name="phone" placeholder="e.g., 057-123456">
+            </div>
+
+            <div class="section-label">Contact Person</div>
+            <div class="form-group">
+                <label>Contact Person Name</label>
+                <input type="text" name="contact_person" placeholder="e.g., Dr. Jane Wanjiru">
+            </div>
+
+            <div class="form-group">
+                <label>Contact Email</label>
+                <input type="email" name="contact_email" placeholder="e.g., admin@hospital.co.ke">
+            </div>
+
+            <div class="section-label">Login Credentials</div>
+            <div class="form-group">
+                <label>Username *</label>
+                <input type="text" name="username" required placeholder="e.g., siaya.hospital">
+                <div class="hint">Lowercase, no spaces. This is what you'll use to log in.</div>
+            </div>
+
+            <div class="row">
+                <div class="form-group">
+                    <label>Password *</label>
+                    <input type="password" name="password" required minlength="6" placeholder="Minimum 6 characters">
+                </div>
+                <div class="form-group">
+                    <label>Confirm Password *</label>
+                    <input type="password" name="confirm_password" required minlength="6" placeholder="Repeat password">
+                </div>
+            </div>
+
+            <button type="submit">CREATE HOSPITAL ACCOUNT</button>
+        </form>
+
+        {% endif %}
+
+        <a href="/" class="back-link">← Back to Login</a>
+    </div>
+</body>
+</html>

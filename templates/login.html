@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AFYAHIV CARE | Login</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #0D5C2E 0%, #064E3B 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .container { display: flex; max-width: 960px; width: 100%; background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+        .info-panel { background: linear-gradient(135deg, #0D5C2E 0%, #064E3B 100%); color: white; padding: 40px; flex: 1; }
+        .info-panel h1 { font-size: 32px; margin-bottom: 20px; }
+        .info-panel p { font-size: 14px; opacity: 0.85; line-height: 1.6; }
+        .login-panel { padding: 40px; flex: 1; }
+        .login-tabs { display: flex; gap: 10px; margin-bottom: 30px; border-bottom: 2px solid #eee; }
+        .tab { flex: 1; padding: 12px 20px; cursor: pointer; border: none; background: #f0f0f0; color: #666; font-size: 15px; font-weight: 500; text-align: center; transition: all 0.3s; border-radius: 8px 8px 0 0; }
+        .tab.active { background: #0D5C2E; color: white; }
+        .login-form { display: none; }
+        .login-form.active { display: block; }
+        .form-group { margin-bottom: 18px; }
+        label { display: block; margin-bottom: 8px; color: #333; font-weight: 500; font-size: 13px; }
+        input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
+        button.submit { width: 100%; padding: 14px; background: #0D5C2E; color: white; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 10px; }
+        button.submit:hover { background: #064E3B; }
+        .error { background: #ffebee; color: #c62828; padding: 12px; border-radius: 8px; margin-bottom: 20px; text-align: center; font-size: 13px; }
+        .divider { text-align: center; margin: 24px 0 16px; color: #999; font-size: 12px; position: relative; }
+        .divider::before, .divider::after { content: ''; position: absolute; top: 50%; width: 42%; height: 1px; background: #eee; }
+        .divider::before { left: 0; }
+        .divider::after { right: 0; }
+        .register-links { display: flex; gap: 10px; margin-top: 10px; }
+        .register-links a { flex: 1; padding: 12px; text-align: center; text-decoration: none; border-radius: 8px; font-size: 13px; font-weight: 600; transition: all 0.2s; }
+        .register-patient { background: #e8f5e9; color: #0D5C2E; border: 1px solid #0D5C2E; }
+        .register-patient:hover { background: #0D5C2E; color: white; }
+        .register-hospital { background: #e3f2fd; color: #1565C0; border: 1px solid #1565C0; }
+        .register-hospital:hover { background: #1565C0; color: white; }
+        .security-badge { display: inline-block; background: rgba(255,255,255,0.15); color: white; padding: 6px 12px; border-radius: 20px; font-size: 10px; margin-top: 20px; }
+        @media (max-width: 768px) { .container { flex-direction: column; } .info-panel { padding: 24px; } .info-panel h1 { font-size: 22px; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="info-panel">
+            <h1>AFYAHIV CARE</h1>
+            <p>AI-powered health monitoring for rural communities. Available in English &amp; Kiswahili.</p>
+            <div class="security-badge">🔒 CONFIDENTIAL - Patient Identity Protected</div>
+        </div>
+
+        <div class="login-panel">
+            <div class="login-tabs">
+                <button class="tab active" onclick="showTab('patient')">PATIENT LOGIN</button>
+                <button class="tab" onclick="showTab('hospital')">HOSPITAL LOGIN</button>
+            </div>
+
+            {% if error %}
+            <div class="error">{{ error }}</div>
+            {% endif %}
+
+            <!-- PATIENT FORM -->
+            <form method="POST" action="/patient/login" class="login-form active" id="patientForm">
+                <div class="form-group">
+                    <label>PATIENT ID</label>
+                    <input type="text" name="patient_id" placeholder="Enter your Patient ID" required>
+                </div>
+                <div class="form-group">
+                    <label>PASSWORD</label>
+                    <input type="password" name="password" placeholder="Enter your password" required>
+                </div>
+                <button type="submit" class="submit">ACCESS PATIENT DASHBOARD</button>
+                <div style="text-align: center; margin-top: 12px;">
+                    <a href="/forgot_password" style="color: #0D5C2E; font-size: 13px; text-decoration: none;">Forgot password?</a>
+                </div>
+            </form>
+
+            <!-- HOSPITAL FORM -->
+            <form method="POST" action="/hospital/login" class="login-form" id="hospitalForm">
+                <div class="form-group">
+                    <label>HOSPITAL USERNAME</label>
+                    <input type="text" name="username" placeholder="e.g., siaya.hospital" required>
+                </div>
+                <div class="form-group">
+                    <label>PASSWORD</label>
+                    <input type="password" name="password" placeholder="Enter your password" required>
+                </div>
+                <button type="submit" class="submit">ACCESS HOSPITAL DASHBOARD</button>
+                <div style="text-align: center; margin-top: 12px;">
+                    <a href="/forgot_password" style="color: #1565C0; font-size: 13px; text-decoration: none;">Forgot password?</a>
+                </div>
+            </form>
+
+            <div class="divider">NEW HERE?</div>
+            <div class="register-links">
+                <a href="/patient/register" class="register-patient">👤 Register as Patient</a>
+                <a href="/hospital/register" class="register-hospital">🏥 Register Hospital</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showTab(type) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.login-form').forEach(f => f.classList.remove('active'));
+            if (type === 'patient') {
+                document.querySelectorAll('.tab')[0].classList.add('active');
+                document.getElementById('patientForm').classList.add('active');
+            } else {
+                document.querySelectorAll('.tab')[1].classList.add('active');
+                document.getElementById('hospitalForm').classList.add('active');
+            }
+        }
+    </script>
+</body>
+</html>

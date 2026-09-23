@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AFYAHIV CARE - Voice Call Simulator</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e8e3e 0%, #0d5e2a 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            max-width: 650px;
+            width: 100%;
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 { text-align: center; margin-bottom: 10px; color: #333; }
+        .subtitle { text-align: center; color: #666; margin-bottom: 30px; }
+        .phone-icon { font-size: 80px; text-align: center; margin: 20px 0; }
+        .call-status {
+            background: #f5f5f5;
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+            min-height: 180px;
+        }
+        .recording {
+            animation: pulse 1s infinite;
+            color: #f44336;
+            font-weight: bold;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.05); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        select, textarea {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        textarea {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            resize: vertical;
+        }
+        button {
+            width: 100%;
+            padding: 14px;
+            background: #1e8e3e;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+        }
+        .back-link {
+            display: block;
+            text-align: center;
+            margin-top: 20px;
+            color: #1e8e3e;
+            text-decoration: none;
+        }
+        .record-btn {
+            background: #f44336;
+        }
+        .record-btn.recording-active {
+            background: #d32f2f;
+            animation: pulse 0.5s infinite;
+        }
+        .stop-btn {
+            background: #ff9800;
+        }
+        .submit-btn {
+            background: #2196F3;
+        }
+        .recognized-text {
+            background: #e8f5e9;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            font-size: 18px;
+            font-weight: bold;
+            color: #1e8e3e;
+            text-align: center;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .button-group button {
+            margin-top: 0;
+            flex: 1;
+        }
+        .listening-indicator {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin: 15px 0;
+        }
+        .listening-dot {
+            width: 15px;
+            height: 15px;
+            background: #f44336;
+            border-radius: 50%;
+            animation: blink 0.5s infinite;
+        }
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>AFYAHIV CARE</h1>
+    <p class="subtitle">Voice Call Simulator</p>
+    
+    <div class="phone-icon">🎤</div>
+    
+    <div class="call-status" id="callStatus">
+        <p>Click "Start Recording" and speak clearly</p>
+        <p style="font-size: 12px; margin-top: 10px;">Your voice will be converted to text</p>
+    </div>
+    
+    <select id="patientSelect">
+        <option value="+254712345678">HIV001 - Mary Atieno (Siaya Town)</option>
+        <option value="+254723456789">HIV002 - John Omondi (Bondo)</option>
+    </select>
+    
+    <div class="button-group">
+        <button id="recordBtn" class="record-btn" onclick="startRecording()">🎙️ Start Recording</button>
+        <button id="stopBtn" class="stop-btn" onclick="stopRecording()" disabled>⏹️ Stop</button>
+    </div>
+    
+    <div id="listeningIndicator" style="display: none;">
+        <div class="listening-indicator">
+            <div class="listening-dot"></div>
+            <span class="recording">🔴 LISTENING... Speak now</span>
+            <div class="listening-dot"></div>
+        </div>
+    </div>
+    
+    <div id="recognizedTextDiv" style="display: none;">
+        <div class="recognized-text">
+            <strong>📝 You said:</strong><br>
+            <span id="recognizedText"></span>
+        </div>
+    </div>
+    
+    <textarea id="messageText" rows="4" placeholder="Or type your message here..."></textarea>
+    
+    <div class="button-group">
+        <button id="submitBtn" class="submit-btn" onclick="submitReport()" disabled>📞 Submit to AI</button>
+        <button onclick="clearText()" style="background: #607D8B;">🗑️ Clear</button>
+    </div>
+    
+    <div id="result" class="result"></div>
+    
+    <div class="example-buttons" style="display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap;">
+        <button onclick="setExample('Nina homa na kichwa')" style="background: #607D8B; font-size: 12px; padding: 8px; margin-top: 0; flex: 1;">Kiswahili: Homa</button>
+        <button onclick="setExample('I have fever and headache')" style="background: #607D8B; font-size: 12px; padding: 8px; margin-top: 0; flex: 1;">English: Fever</button>
+        <button onclick="setExample('Nina damu na maumivu makali')" style="background: #607D8B; font-size: 12px; padding: 8px; margin-top: 0; flex: 1;">Emergency: Damu</button>
+    </div>
+    
+    <a href="/doctor/dashboard" class="back-link">Back to Doctor Dashboard</a>
+</div>
+
+<script>
+    let recognition = null;
+    let isRecording = false;
+    let lastRecognizedText = '';
+    
+    function startRecording() {
+        if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+            document.getElementById('callStatus').innerHTML = `
+                <p style="color: red;">❌ Speech recognition not supported</p>
+                <p>Please use Google Chrome browser</p>
+                <p>Or type your message in the text box above</p>
+            `;
+            return;
+        }
+        
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        recognition = new SpeechRecognition();
+        recognition.lang = 'en-US';
+        recognition.continuous = false;
+        recognition.interimResults = true;
+        
+        const callStatus = document.getElementById('callStatus');
+        const recordBtn = document.getElementById('recordBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const submitBtn = document.getElementById('submitBtn');
+        const listeningIndicator = document.getElementById('listeningIndicator');
+        const recognizedTextDiv = document.getElementById('recognizedTextDiv');
+        
+        recognition.onstart = function() {
+            isRecording = true;
+            recordBtn.disabled = true;
+            stopBtn.disabled = false;
+            submitBtn.disabled = true;
+            listeningIndicator.style.display = 'block';
+            recognizedTextDiv.style.display = 'none';
+            callStatus.innerHTML = `
+                <p class="recording">🎤 MICROPHONE ACTIVE</p>
+                <p>Please speak clearly into your microphone</p>
+                <p>Example: "Nina homa na kichwa" or "I have fever"</p>
+                <p style="font-size: 12px;">Click STOP when you finish speaking</p>
+            `;
+        };
+        
+        recognition.onresult = function(event) {
+            let finalTranscript = '';
+            
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                if (event.results[i].isFinal) {
+                    finalTranscript += event.results[i][0].transcript;
+                }
+            }
+            
+            if (finalTranscript) {
+                lastRecognizedText = finalTranscript;
+                document.getElementById('recognizedText').innerHTML = finalTranscript;
+                document.getElementById('messageText').value = finalTranscript;
+                recognizedTextDiv.style.display = 'block';
+                callStatus.innerHTML = `
+                    <p>✅ Voice captured successfully!</p>
+                    <p>Click "Submit to AI" to send your report</p>
+                `;
+                submitBtn.disabled = false;
+                stopRecording();
+            }
+        };
+        
+        recognition.onerror = function(event) {
+            callStatus.innerHTML = `
+                <p style="color: red;">❌ Error: ${event.error}</p>
+                <p>Please check your microphone and try again</p>
+                <p>Or type your message in the text box</p>
+            `;
+            stopRecording();
+        };
+        
+        recognition.onend = function() {
+            if (isRecording) {
+                callStatus.innerHTML = `
+                    <p>⏹️ Recording stopped</p>
+                    <p>Click "Start Recording" to try again</p>
+                    <p>Or type your message in the text box</p>
+                `;
+                stopRecording();
+            }
+        };
+        
+        recognition.start();
+    }
+    
+    function stopRecording() {
+        if (recognition && isRecording) {
+            recognition.stop();
+        }
+        isRecording = false;
+        document.getElementById('recordBtn').disabled = false;
+        document.getElementById('stopBtn').disabled = true;
+        document.getElementById('listeningIndicator').style.display = 'none';
+    }
+    
+    async function submitReport() {
+        const reportText = document.getElementById('messageText').value;
+        const patientPhone = document.getElementById('patientSelect').value;
+        const resultDiv = document.getElementById('result');
+        const callStatus = document.getElementById('callStatus');
+        const submitBtn = document.getElementById('submitBtn');
+        
+        if (!reportText.trim()) {
+            alert('Please record or type a message first');
+            return;
+        }
+        
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Processing...';
+        
+        callStatus.innerHTML = `
+            <p>📤 Sending to AI...</p>
+            <p>🤖 Analyzing your health report</p>
+        `;
+        
+        try {
+            const formData = new FormData();
+            formData.append('report_text', reportText);
+            formData.append('patient_phone', patientPhone);
+            
+            const response = await fetch('/patient/voice_report', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const result = await response.json();
+            
+            const riskColor = result.risk_level === 'high' ? '#C62828' : (result.risk_level === 'medium' ? '#E65100' : '#2E7D32');
+            const riskText = result.risk_level === 'high' ? 'HIGH - Emergency! Doctor notified' : (result.risk_level === 'medium' ? 'MEDIUM - Monitor symptoms' : 'LOW - Continue as normal');
+            
+            callStatus.innerHTML = `
+                <p>✅ Report processed successfully!</p>
+                <p>🤖 <strong>AI Response:</strong> ${result.response}</p>
+                <p>📊 <strong>Risk Level:</strong> <span style="color: ${riskColor}; font-weight: bold;">${riskText}</span></p>
+            `;
+            
+            resultDiv.style.display = 'block';
+            resultDiv.style.background = '#e8f5e9';
+            resultDiv.innerHTML = `
+                <strong>✅ Voice Call Completed!</strong><br><br>
+                <strong>You said:</strong> "${reportText}"<br>
+                <strong>AI Response:</strong> ${result.response}<br>
+                <strong>Risk Level:</strong> ${riskText}<br><br>
+                This report has been saved and sent to your doctor.
+            `;
+            
+            if (window.speechSynthesis) {
+                const utterance = new SpeechSynthesisUtterance(result.response);
+                utterance.lang = 'en-US';
+                utterance.rate = 0.9;
+                window.speechSynthesis.speak(utterance);
+            }
+            
+            document.getElementById('messageText').value = '';
+            document.getElementById('recognizedTextDiv').style.display = 'none';
+            lastRecognizedText = '';
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Submit to AI';
+            
+        } catch (error) {
+            callStatus.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Submit to AI';
+        }
+    }
+    
+    function setExample(text) {
+        document.getElementById('messageText').value = text;
+        document.getElementById('recognizedText').innerHTML = text;
+        document.getElementById('recognizedTextDiv').style.display = 'block';
+        document.getElementById('submitBtn').disabled = false;
+        document.getElementById('callStatus').innerHTML = `
+            <p>📝 Example loaded</p>
+            <p>Click "Submit to AI" to send your report</p>
+        `;
+    }
+    
+    function clearText() {
+        document.getElementById('messageText').value = '';
+        document.getElementById('recognizedTextDiv').style.display = 'none';
+        document.getElementById('submitBtn').disabled = true;
+        lastRecognizedText = '';
+        document.getElementById('callStatus').innerHTML = `
+            <p>Text cleared</p>
+            <p>Click "Start Recording" to speak or type a message</p>
+        `;
+    }
+</script>
+</body>
+</html>
