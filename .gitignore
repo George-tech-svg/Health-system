@@ -1,35 +1,20 @@
-@'
-# Environment
 .env
 .env.local
-
-# Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-
-# Virtual environments
 venv/
 env/
 .venv/
-
-# Database files (local only)
 *.db
 *.sqlite
 *.sqlite3
-
-# Backups
 *.old
 *.bak
 backups/
-
-# IDE / OS
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
-
-# Logs
 *.log
-'@ | Out-File -FilePath ".gitignore" -Encoding utf8
