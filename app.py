@@ -16,6 +16,31 @@ import os
 import json
 import atexit
 
+
+import cloudinary
+import cloudinary.uploader
+
+cloudinary.config(
+    cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
+    api_key=os.getenv("CLOUDINARY_API_KEY"),
+    api_secret=os.getenv("CLOUDINARY_API_SECRET"),
+    secure=True,
+)
+
+
+def upload_to_cloudinary(file_obj, folder, resource_type="image"):
+    """Upload a Flask FileStorage to Cloudinary, return the secure URL."""
+    try:
+        result = cloudinary.uploader.upload(
+            file_obj,
+            folder="fastafya/" + folder,
+            resource_type=resource_type,
+        )
+        return result.get("secure_url")
+    except Exception as e:
+        print("Cloudinary upload error: " + str(e))
+        return None
+
 app = Flask(__name__)
 app.secret_key = "fastafya-secret-key-2024"
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=60)
@@ -68,8 +93,14 @@ def hospital_login_required(f):
 
 
 def doctor_login_required(f):
-    """Legacy alias - delegates to hospital_login_required."""
-    return hospital_login_required(f)
+    """Allows hospital accounts AND Director (super_admin) sessions."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        ut = session.get('user_type')
+        if ut not in ('hospital', 'super_admin'):
+            return redirect(url_for('index'))
+        return f(*args, **kwargs)
+    return decorated_function
 
 
 def patient_login_required(f):
@@ -88,10 +119,12 @@ escalated_emergencies = set()
 def check_and_send_medication_reminders():
     try:
         patients = db.get_all_patients()
+    except Exception:
+        return
+    try:
         current_time = datetime.now()
         current_hour = current_time.hour
         current_minute = current_time.minute
-        print("\n🔔 Checking medication reminders at " + current_time.strftime('%H:%M:%S'))
         for patient in patients:
             patient_id = patient[1]
             patient_name = patient[2]
@@ -145,6 +178,9 @@ def check_unresponded_emergencies():
     global escalated_emergencies
     try:
         rows = db.get_unresponded_emergencies_older_than(minutes=5)
+    except Exception:
+        return
+    try:
         for emergency in rows:
             emergency_id = emergency[0]
             patient_id = emergency[1]
@@ -348,13 +384,27 @@ def hospital_register():
         return render_template('hospital_register.html', error="That username is already taken.")
 
     try:
-        db.register_hospital(
+        # 1. Create hospital
+        hospital_id = db.register_hospital(
             name=name, village=village, county=county, sub_county=sub_county,
             address=address, phone=phone, contact_person=contact_person,
             contact_email=contact_email, username=username, password=password,
         )
-        db.add_audit_log('hospital', username, 'register', 'Hospital ' + name + ' registered')
-        return render_template('hospital_register.html', success=True, username=username)
+        # 2. Create Director (super_admin) linked to this hospital
+        director_username = username
+        existing_sa = db.get_super_admin_by_username(director_username)
+        if not existing_sa:
+            db.create_super_admin(
+                username=director_username,
+                password=password,
+                full_name=contact_person or ("Director of " + name),
+                hospital_id=hospital_id,
+                email=contact_email,
+                phone=phone,
+            )
+        db.add_audit_log('hospital', username, 'register',
+                         'Hospital ' + name + ' + Director ' + director_username + ' registered')
+        return render_template('hospital_register.html', success=True, username=director_username)
     except Exception as e:
         return render_template('hospital_register.html', error="Registration failed: " + str(e))
 
@@ -434,11 +484,9 @@ def patient_voice_with_audio():
         if 'audio' in request.files:
             audio_file = request.files['audio']
             if audio_file and audio_file.filename != '':
-                audio_dir = os.path.join('static', 'voice_recordings')
-                if not os.path.exists(audio_dir):
-                    os.makedirs(audio_dir)
-                audio_filename = patient[1] + "_" + datetime.now().strftime('%Y%m%d_%H%M%S') + ".webm"
-                audio_file.save(os.path.join(audio_dir, audio_filename))
+                audio_filename = upload_to_cloudinary(
+                    audio_file, "voice/patients/" + patient[1], "video"
+                )
         db.save_message_with_parent_and_reply(
             patient[1], 'outgoing', 'voice', report_text, 'English',
             analysis['risk_level'], ','.join(analysis['symptoms']), analysis['response'],
@@ -462,11 +510,9 @@ def patient_video_upload():
         if 'video' in request.files:
             video_file = request.files['video']
             if video_file and video_file.filename != '':
-                video_dir = os.path.join('static', 'video_recordings')
-                if not os.path.exists(video_dir):
-                    os.makedirs(video_dir)
-                video_filename = "VID_" + patient[1] + "_" + datetime.now().strftime('%Y%m%d_%H%M%S') + ".webm"
-                video_file.save(os.path.join(video_dir, video_filename))
+                video_filename = upload_to_cloudinary(
+                    video_file, "video/patients/" + patient[1], "video"
+                )
         description = request.form.get('description', 'Video message')
         db.save_message_with_parent_and_reply(
             patient[1], 'outgoing', 'video', description, 'English',
@@ -692,12 +738,9 @@ def patient_send_emergency_reply():
     if message_type == 'audio' and 'audio' in request.files:
         audio = request.files['audio']
         if audio and audio.filename != '':
-            audio_dir = os.path.join('static', 'emergency_audio')
-            if not os.path.exists(audio_dir):
-                os.makedirs(audio_dir)
-            audio_filename = "patient_reply_" + str(emergency_id) + "_" + datetime.now().strftime('%Y%m%d_%H%M%S') + ".webm"
-            audio.save(os.path.join(audio_dir, audio_filename))
-            audio_file = audio_filename
+            audio_file = upload_to_cloudinary(
+                audio, "emergency/patient/" + str(emergency_id), "video"
+            )
             content = "Voice message from patient"
     db.save_emergency_message(emergency_id, 'patient', message_type, content, audio_file)
     return jsonify({"status": "success"})
@@ -827,11 +870,9 @@ def doctor_send_voice_reply():
     if 'audio' in request.files:
         audio_file = request.files['audio']
         if audio_file and audio_file.filename != '':
-            audio_dir = os.path.join('static', 'voice_recordings')
-            if not os.path.exists(audio_dir):
-                os.makedirs(audio_dir)
-            audio_filename = "DR_" + patient[1] + "_" + datetime.now().strftime('%Y%m%d_%H%M%S') + ".webm"
-            audio_file.save(os.path.join(audio_dir, audio_filename))
+            audio_filename = upload_to_cloudinary(
+                audio_file, "voice/doctors/" + patient[1], "video"
+            )
     conn = db.get_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -858,11 +899,9 @@ def doctor_send_video_reply():
     if 'video' in request.files:
         video_file = request.files['video']
         if video_file and video_file.filename != '':
-            video_dir = os.path.join('static', 'video_recordings')
-            if not os.path.exists(video_dir):
-                os.makedirs(video_dir)
-            video_filename = "DR_VID_" + patient[1] + "_" + datetime.now().strftime('%Y%m%d_%H%M%S') + ".webm"
-            video_file.save(os.path.join(video_dir, video_filename))
+            video_filename = upload_to_cloudinary(
+                video_file, "video/doctors/" + patient[1], "video"
+            )
     conn = db.get_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -1120,12 +1159,9 @@ def doctor_send_emergency_reply():
     if message_type == 'audio' and 'audio' in request.files:
         audio = request.files['audio']
         if audio and audio.filename != '':
-            audio_dir = os.path.join('static', 'emergency_audio')
-            if not os.path.exists(audio_dir):
-                os.makedirs(audio_dir)
-            audio_filename = "doctor_reply_" + str(emergency_id) + "_" + datetime.now().strftime('%Y%m%d_%H%M%S') + ".webm"
-            audio.save(os.path.join(audio_dir, audio_filename))
-            audio_file = audio_filename
+            audio_file = upload_to_cloudinary(
+                audio, "emergency/doctor/" + str(emergency_id), "video"
+            )
             content = "Voice message from hospital"
     if not emergency['doctor_response_timestamp']:
         db.record_doctor_emergency_response(emergency_id)
@@ -1280,6 +1316,586 @@ def forgot_password_hospital():
         return render_template('forgot_password.html', success=True, success_message="Password reset successfully.", active_tab='hospital')
     except Exception as e:
         return render_template('forgot_password.html', hospital_error="Reset failed: " + str(e), active_tab='hospital')
+
+
+
+
+# ============ SUPER ADMIN ============
+def super_admin_login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_type' not in session or session.get('user_type') != 'super_admin':
+            return redirect(url_for('index'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+def _time_ago(iso_ts):
+    if not iso_ts:
+        return '—'
+    try:
+        t = datetime.fromisoformat(iso_ts)
+        secs = int((datetime.now() - t).total_seconds())
+        if secs < 60: return str(secs) + 's ago'
+        if secs < 3600: return str(secs // 60) + 'm ago'
+        if secs < 86400: return str(secs // 3600) + 'h ago'
+        return str(secs // 86400) + 'd ago'
+    except Exception:
+        return str(iso_ts)[:19]
+
+
+def _response_time(e):
+    if not e.get('doctor_response_timestamp') or not e.get('timestamp'):
+        return '—'
+    try:
+        sent = datetime.fromisoformat(e['timestamp'])
+        resp = datetime.fromisoformat(e['doctor_response_timestamp'])
+        return str(round((resp - sent).total_seconds() / 60, 1)) + ' min'
+    except Exception:
+        return '—'
+
+
+@app.route('/super_admin/login', methods=['POST'])
+def super_admin_login():
+    username = request.form.get('username', '').strip()
+    password = request.form.get('password', '')
+    if not username or not password:
+        return render_template('login.html', error="Please enter username and password")
+    conn = db.get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """SELECT id, username, password_hash, full_name, email, phone, is_active, last_login
+           FROM super_admins WHERE username = ? AND is_active = 1""",
+        (username,),
+    )
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return render_template('login.html', error="Invalid credentials")
+    from password_utils import verify_password
+    if not verify_password(password, row[2]):
+        conn.close()
+        return render_template('login.html', error="Invalid credentials")
+    cursor.execute("UPDATE super_admins SET last_login = ? WHERE id = ?",
+                   (datetime.now().isoformat(), row[0]))
+    conn.commit()
+    conn.close()
+    session.clear()
+    session['user_type'] = 'super_admin'
+    session['super_admin_id'] = row[0]
+    session['super_admin_username'] = row[1]
+    session['super_admin_name'] = row[3]
+    # Use the director's linked hospital
+    hid = None
+    try:
+        conn2 = db.get_connection()
+        c2 = conn2.cursor()
+        c2.execute("SELECT hospital_id FROM super_admins WHERE id = ?", (row[0],))
+        rr = c2.fetchone()
+        if rr and rr[0]:
+            hid = rr[0]
+        conn2.close()
+    except Exception:
+        pass
+    session['hospital_id'] = hid or 1
+    session['hospital_name'] = 'FastAfya Hospital'
+    if hid:
+        try:
+            h = db.get_hospital_by_id(hid)
+            if h:
+                session['hospital_name'] = h[1]
+        except Exception:
+            pass
+    session.permanent = True
+    db.add_audit_log('super_admin', username, 'login', 'Super Admin logged in')
+    return redirect(url_for('super_admin_dashboard'))
+
+
+@app.route('/super_admin/dashboard')
+@super_admin_login_required
+def super_admin_dashboard():
+    super_admin = {
+        'id': session.get('super_admin_id'),
+        'username': session.get('super_admin_username'),
+        'full_name': session.get('super_admin_name', 'Director'),
+        'last_login': None,
+    }
+    try:
+        conn = db.get_connection()
+        c = conn.cursor()
+        c.execute("SELECT last_login FROM super_admins WHERE id = ?", (super_admin['id'],))
+        r = c.fetchone()
+        if r: super_admin['last_login'] = r[0]
+        conn.close()
+    except Exception:
+        pass
+
+    hid = session.get('hospital_id', 1)
+    departments = db.get_hospital_departments(hid, active_only=False)
+    patients_raw = db.get_all_patients(hospital_id=hid)
+    patients = [{'patient_id': p[1], 'full_name': p[2], 'phone_number': p[3],
+                 'location': p[4], 'registration_date': p[7], 'status': p[8]}
+                for p in patients_raw]
+    active_emergencies = db.get_active_emergencies(hospital_id=hid)
+
+    stats = {
+        'total_patients': len(patients),
+        'active_departments': len([d for d in departments if d['is_active']]),
+        'open_emergencies': len(active_emergencies),
+        'unanswered': 0,
+        'refills_week': 0,
+    }
+
+    activity = []
+    try:
+        conn = db.get_connection()
+        c = conn.cursor()
+        c.execute("""SELECT user_type, user_id, action, details, timestamp
+                     FROM audit_logs ORDER BY id DESC LIMIT 15""")
+        for r in c.fetchall():
+            activity.append({
+                'text': str(r[0]) + ' "' + str(r[1] or '') + '" — ' + str(r[2] or '') + ': ' + str(r[3] or ''),
+                'when': _time_ago(r[4]),
+            })
+        conn.close()
+    except Exception:
+        pass
+
+    dept_health = [{
+        'name': d['name'], 'open_chats': 0, 'unanswered': 0, 'last_response': '—',
+        'status_class': 'ok' if d['is_active'] else 'danger',
+        'status_label': 'Active' if d['is_active'] else 'Inactive',
+    } for d in departments]
+
+    alerts = []
+    for d in departments:
+        if d['is_active'] and not d['username']:
+            alerts.append({'text': "Department '" + d['name'] + "' has no login credentials", 'level': 'warn'})
+
+    resolved_emergencies = []
+    try:
+        conn = db.get_connection()
+        c = conn.cursor()
+        c.execute("""SELECT patient_name, timestamp, resolved_timestamp, doctor_response_timestamp
+                     FROM emergencies WHERE status = 'resolved' ORDER BY id DESC LIMIT 20""")
+        for r in c.fetchall():
+            rt = '—'
+            if r[3] and r[1]:
+                try:
+                    rt = str(round((datetime.fromisoformat(r[3]) - datetime.fromisoformat(r[1])).total_seconds() / 60, 1)) + ' min'
+                except Exception:
+                    pass
+            resolved_emergencies.append({
+                'patient_name': r[0], 'when': _time_ago(r[1]),
+                'resolved_when': _time_ago(r[2]), 'response_time': rt,
+            })
+        conn.close()
+    except Exception:
+        pass
+
+    audit = []
+    try:
+        conn = db.get_connection()
+        c = conn.cursor()
+        c.execute("""SELECT user_type, user_id, action, details, timestamp
+                     FROM audit_logs ORDER BY id DESC LIMIT 100""")
+        for r in c.fetchall():
+            audit.append({
+                'user_type': r[0], 'user_id': r[1], 'action': r[2],
+                'details': r[3], 'when': str(r[4])[:19] if r[4] else '—',
+            })
+        conn.close()
+    except Exception:
+        pass
+
+    return render_template(
+        'super_admin_dashboard.html',
+        super_admin=super_admin, stats=stats, activity=activity, alerts=alerts,
+        dept_health=dept_health, departments=departments, patients=patients,
+        active_emergencies=[{
+            'patient_name': e['patient_name'],
+            'location_address': e.get('location_address'),
+            'when': _time_ago(e['timestamp']),
+            'responded': e.get('doctor_response_timestamp') is not None,
+            'response_time': _response_time(e),
+        } for e in active_emergencies],
+        resolved_emergencies=resolved_emergencies,
+        conversations=[], referrals=[], prescriptions=[], refills=[],
+        audit=audit, session=session,
+    )
+
+
+@app.route('/super_admin/change_password', methods=['POST'])
+@super_admin_login_required
+def super_admin_change_password():
+    current = request.form.get('current_password', '')
+    new = request.form.get('new_password', '')
+    if len(new) < 6:
+        return redirect(url_for('super_admin_dashboard'))
+    conn = db.get_connection()
+    c = conn.cursor()
+    c.execute("SELECT password_hash FROM super_admins WHERE id = ?", (session['super_admin_id'],))
+    r = c.fetchone()
+    if not r:
+        conn.close()
+        return redirect(url_for('super_admin_dashboard'))
+    from password_utils import verify_password, hash_password
+    if not verify_password(current, r[0]):
+        conn.close()
+        return redirect(url_for('super_admin_dashboard'))
+    c.execute("UPDATE super_admins SET password_hash = ? WHERE id = ?",
+              (hash_password(new), session['super_admin_id']))
+    conn.commit()
+    conn.close()
+    db.add_audit_log('super_admin', session['super_admin_username'], 'change_password', 'Password changed')
+    return redirect(url_for('super_admin_dashboard'))
+
+
+
+
+# ============ DEPARTMENT MANAGEMENT (Director) ============
+@app.route('/hospital/departments')
+@doctor_login_required
+def hospital_departments_page():
+    hid = session.get('hospital_id') or 1
+    departments = db.get_hospital_departments(hid, active_only=False)
+    return render_template('hospital_departments.html',
+                          departments=departments,
+                          hospital_name=session.get('hospital_name', 'Hospital'),
+                          message=request.args.get('message'),
+                          error=request.args.get('error'))
+
+
+@app.route('/hospital/departments/create', methods=['POST'])
+@doctor_login_required
+def hospital_create_department():
+    hid = session.get('hospital_id') or 1
+    name = request.form.get('name', '').strip()
+    username = request.form.get('username', '').strip().lower()
+    password = request.form.get('password', '')
+    if not name or not username or not password:
+        return redirect(url_for('hospital_departments_page', error="Name, username and password are required"))
+    if len(password) < 6:
+        return redirect(url_for('hospital_departments_page', error="Password must be at least 6 characters"))
+    existing = db.get_department_by_username(username)
+    if existing:
+        return redirect(url_for('hospital_departments_page', error="That username is already taken"))
+    try:
+        db.create_department(
+            hospital_id=hid, name=name,
+            description=request.form.get('description', ''),
+            head_doctor=request.form.get('head_doctor', ''),
+            secretary_name=request.form.get('secretary_name', ''),
+            phone=request.form.get('phone', ''),
+            email=request.form.get('email', ''),
+            consultation_fee=request.form.get('consultation_fee', ''),
+            operating_hours=request.form.get('operating_hours', '24/7'),
+            username=username, password=password,
+        )
+        db.add_audit_log('hospital', session.get('hospital_name', ''), 'create_department', 'Created ' + name)
+        return redirect(url_for('hospital_departments_page', message="Department '" + name + "' created"))
+    except Exception as e:
+        return redirect(url_for('hospital_departments_page', error="Failed: " + str(e)))
+
+
+@app.route('/hospital/departments/<int:dept_id>/update', methods=['POST'])
+@doctor_login_required
+def hospital_update_department(dept_id):
+    d = db.get_department_by_id(dept_id)
+    if not d or d['hospital_id'] != (session.get('hospital_id') or 1):
+        return redirect(url_for('hospital_departments_page', error="Not found"))
+    db.update_department(
+        dept_id,
+        name=request.form.get('name'),
+        description=request.form.get('description'),
+        head_doctor=request.form.get('head_doctor'),
+        secretary_name=request.form.get('secretary_name'),
+        phone=request.form.get('phone'),
+        consultation_fee=request.form.get('consultation_fee'),
+        operating_hours=request.form.get('operating_hours'),
+    )
+    return redirect(url_for('hospital_departments_page', message="Updated"))
+
+
+@app.route('/hospital/departments/<int:dept_id>/credentials', methods=['POST'])
+@doctor_login_required
+def hospital_set_dept_credentials(dept_id):
+    d = db.get_department_by_id(dept_id)
+    if not d or d['hospital_id'] != (session.get('hospital_id') or 1):
+        return redirect(url_for('hospital_departments_page', error="Not found"))
+    username = request.form.get('username', '').strip().lower()
+    password = request.form.get('password', '')
+    if not username or len(password) < 6:
+        return redirect(url_for('hospital_departments_page', error="Username and 6+ char password required"))
+    try:
+        db.update_department(dept_id, username=username, password=password)
+        return redirect(url_for('hospital_departments_page', message="Credentials updated"))
+    except Exception as e:
+        return redirect(url_for('hospital_departments_page', error="Failed: " + str(e)))
+
+
+@app.route('/hospital/departments/<int:dept_id>/delete', methods=['POST'])
+@doctor_login_required
+def hospital_delete_department(dept_id):
+    d = db.get_department_by_id(dept_id)
+    if not d or d['hospital_id'] != (session.get('hospital_id') or 1):
+        return redirect(url_for('hospital_departments_page', error="Not found"))
+    db.update_department(dept_id, is_active=0)
+    return redirect(url_for('hospital_departments_page', message="Department deactivated"))
+
+
+@app.route('/hospital/departments/<int:dept_id>/photo', methods=['POST'])
+@doctor_login_required
+def hospital_upload_dept_photo(dept_id):
+    d = db.get_department_by_id(dept_id)
+    if not d or d['hospital_id'] != (session.get('hospital_id') or 1):
+        return redirect(url_for('hospital_departments_page', error="Not found"))
+    if 'photo' not in request.files:
+        return redirect(url_for('hospital_departments_page', error="No file uploaded"))
+    file = request.files['photo']
+    if not file.filename:
+        return redirect(url_for('hospital_departments_page', error="No file selected"))
+    ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else 'jpg'
+    if ext not in ('jpg', 'jpeg', 'png', 'gif', 'webp'):
+        return redirect(url_for('hospital_departments_page', error="Only image files allowed"))
+    photo_dir = os.path.join('static', 'department_photos')
+    os.makedirs(photo_dir, exist_ok=True)
+    fname = "dept_" + str(dept_id) + "_" + uuid.uuid4().hex[:8] + "." + ext
+    file.save(os.path.join(photo_dir, fname))
+    db.add_department_photo(dept_id, fname, request.form.get('caption', ''))
+    return redirect(url_for('hospital_departments_page', message="Photo uploaded"))
+
+
+
+
+@app.route('/hospital/departments/toggle/<int:dept_id>', methods=['POST'])
+@doctor_login_required
+def hospital_toggle_department(dept_id):
+    d = db.get_department_by_id(dept_id)
+    if not d or d['hospital_id'] != (session.get('hospital_id') or 1):
+        return redirect(url_for('hospital_departments_page', error="Not found"))
+    new_status = 0 if d['is_active'] else 1
+    db.update_department(dept_id, is_active=new_status)
+    msg = "Department activated" if new_status else "Department deactivated"
+    db.add_audit_log('hospital', session.get('hospital_name', ''), 'toggle_department', msg + ': ' + d['name'])
+    return redirect(url_for('hospital_departments_page', message=msg))
+
+
+
+
+# ============ DEPARTMENT ROUTES ============
+def department_login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_type' not in session or session.get('user_type') != 'department':
+            return redirect(url_for('index'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+@app.route('/department/login', methods=['POST'])
+def department_login():
+    username = request.form.get('username', '').strip().lower()
+    password = request.form.get('password', '')
+    if not username or not password:
+        return render_template('login.html', error="Please enter username and password")
+    failed_count = db.get_failed_attempts(username=username)
+    if failed_count >= 5:
+        return render_template('login.html', error="Account locked. Try again later.")
+    dept = db.authenticate_department(username, password)
+    if dept:
+        db.clear_failed_attempts(username=username)
+        session.clear()
+        session['user_type'] = 'department'
+        session['department_id'] = dept['id']
+        session['department_name'] = dept['name']
+        session['hospital_id'] = dept['hospital_id']
+        session['hospital_name'] = dept.get('hospital_name', 'Hospital')
+        session['doctor_id'] = dept['id']
+        session['doctor_name'] = dept['name']
+        session['hospital'] = session['hospital_name']
+        session.permanent = True
+        db.add_audit_log('department', username, 'login', 'Department ' + dept['name'] + ' logged in')
+        return redirect(url_for('department_dashboard'))
+    db.record_failed_login(username=username)
+    remaining = 4 - failed_count
+    return render_template('login.html', error="Invalid credentials. " + str(remaining) + " attempts remaining.")
+
+
+@app.route('/department/dashboard')
+@department_login_required
+def department_dashboard():
+    dept_id = session['department_id']
+    dept = db.get_department_by_id(dept_id)
+    if not dept:
+        session.clear()
+        return redirect(url_for('index'))
+    hospital = db.get_hospital_by_id(dept['hospital_id'])
+    if hospital:
+        dept['hospital_name'] = hospital[1]
+        dept['hospital_county'] = hospital[10] if len(hospital) > 10 else ''
+    else:
+        dept['hospital_name'] = session.get('hospital_name', 'Hospital')
+        dept['hospital_county'] = ''
+    photos = db.get_department_photos(dept_id)
+    services = db.get_department_services(dept_id)
+    patients_raw = db.get_all_patients(hospital_id=dept['hospital_id'])
+    patients = [{'patient_id': p[1], 'full_name': p[2], 'location': p[4]}
+                for p in patients_raw]
+    emergencies = db.get_active_emergencies(hospital_id=dept['hospital_id'])
+    stats = db.get_department_stats(dept_id)
+    return render_template('department_dashboard.html',
+                          department=dept,
+                          photos=photos,
+                          services=services,
+                          patients=patients,
+                          patient_count=len(patients),
+                          active_emergencies=len(emergencies),
+                          stats=stats,
+                          session=session)
+
+
+
+
+@app.route('/favicon.ico')
+def favicon():
+    return "", 204
+
+
+
+
+# ============ DEPARTMENT FULL FUNCTIONALITY ============
+@app.route('/department/enquiries')
+@department_login_required
+def department_enquiries():
+    dept_id = session['department_id']
+    threads = db.get_department_threads(dept_id)
+    return jsonify(threads)
+
+
+@app.route('/department/enquiry/<patient_id>')
+@department_login_required
+def department_enquiry_thread(patient_id):
+    dept_id = session['department_id']
+    msgs = db.get_department_patient_thread(patient_id, dept_id)
+    db.mark_department_thread_read(patient_id, dept_id)
+    patient = db.get_patient_by_id(patient_id)
+    return jsonify({
+        "patient": {
+            "id": patient_id,
+            "name": patient[2] if patient else "",
+            "phone": patient[3] if patient else "",
+            "location": patient[5] if patient else "",
+        },
+        "messages": msgs,
+    })
+
+
+@app.route('/department/enquiry/<patient_id>/reply', methods=['POST'])
+@department_login_required
+def department_enquiry_reply(patient_id):
+    dept_id = session['department_id']
+    content = request.form.get('content', '').strip()
+    if not content:
+        return jsonify({"error": "Message required"}), 400
+    db.send_department_message(patient_id, dept_id, 'incoming', content)
+    patient = db.get_patient_by_id(patient_id)
+    if patient:
+        sms_handler.send_sms(patient[3], content, 'English')
+    return jsonify({"status": "success"})
+
+
+@app.route('/department/bookings')
+@department_login_required
+def department_bookings():
+    dept_id = session['department_id']
+    status = request.args.get('status')
+    appts = db.get_department_appointments(dept_id, status)
+    return jsonify(appts)
+
+
+@app.route('/department/booking/<int:appt_id>/status', methods=['POST'])
+@department_login_required
+def department_booking_status(appt_id):
+    dept_id = session['department_id']
+    status = request.json.get('status') if request.is_json else request.form.get('status')
+    if status not in ('pending', 'confirmed', 'checked_in', 'completed', 'cancelled', 'no_show'):
+        return jsonify({"error": "Invalid status"}), 400
+    db.update_appointment_status(appt_id, status, dept_id)
+    return jsonify({"status": "success"})
+
+
+@app.route('/department/my-patients')
+@department_login_required
+def department_my_patients():
+    dept_id = session['department_id']
+    return jsonify(db.get_department_patients(dept_id))
+
+
+@app.route('/department/treatments')
+@department_login_required
+def department_treatments_list():
+    dept_id = session['department_id']
+    return jsonify(db.get_department_treatments(dept_id))
+
+
+@app.route('/department/prescribe', methods=['POST'])
+@department_login_required
+def department_prescribe():
+    dept_id = session['department_id']
+    dept = db.get_department_by_id(dept_id)
+    data = request.json
+    patient_id = data.get('patient_id')
+    if not patient_id:
+        return jsonify({"error": "Patient ID required"}), 400
+    tid = db.create_department_treatment(
+        patient_id, dept_id, dept['name'],
+        data.get('diagnosis', ''), data.get('notes', ''),
+        data.get('next_appointment_date', ''),
+        data.get('next_appointment_reason', ''),
+    )
+    # Prescribed meds
+    for med in data.get('medications', []):
+        db.add_prescribed_medication(
+            tid, med.get('medication_name'), med.get('dosage_amount'),
+            med.get('dosage_unit', 'pill(s)'), med.get('times_per_day'),
+            med.get('schedule_times', []), med.get('duration_days'),
+            med.get('instructions', ''),
+        )
+    # Notify patient
+    patient = db.get_patient_by_id(patient_id)
+    if patient:
+        msg = "New treatment from " + dept['name'] + ". Check your dashboard."
+        db.send_department_message(patient_id, dept_id, 'incoming', msg)
+        sms_handler.send_sms(patient[3], msg, 'English')
+    return jsonify({"status": "success", "treatment_id": tid})
+
+
+@app.route('/department/photo/upload', methods=['POST'])
+@department_login_required
+def department_photo_upload():
+    dept_id = session['department_id']
+    if 'photo' not in request.files:
+        return jsonify({"error": "No file"}), 400
+    file = request.files['photo']
+    if not file.filename:
+        return jsonify({"error": "Empty file"}), 400
+    url = upload_to_cloudinary(file, "departments/" + str(dept_id), "image")
+    if not url:
+        return jsonify({"error": "Upload failed"}), 500
+    db.add_department_photo(dept_id, url, request.form.get('caption', ''))
+    return jsonify({"status": "success", "url": url})
+
+
+@app.route('/department/service/add', methods=['POST'])
+@department_login_required
+def department_service_add():
+    dept_id = session['department_id']
+    name = request.form.get('name', '').strip()
+    if not name:
+        return jsonify({"error": "Name required"}), 400
+    db.add_department_service(dept_id, name, request.form.get('description', ''))
+    return jsonify({"status": "success"})
 
 
 # ============ MAIN ============

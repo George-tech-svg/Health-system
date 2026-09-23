@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FastAfya | Hospital Director</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f7fa; }
+.layout { display: flex; min-height: 100vh; }
+.sidebar { width: 250px; background: linear-gradient(180deg, #0D5C2E 0%, #064E3B 100%); color: white; padding: 22px 14px; position: fixed; height: 100vh; overflow-y: auto; }
+.logo { font-size: 20px; font-weight: bold; text-align: center; margin-bottom: 4px; }
+.logo-sub { font-size: 9px; opacity: 0.7; text-align: center; margin-bottom: 22px; letter-spacing: 1px; }
+.profile { background: rgba(255,255,255,0.1); border-radius: 12px; padding: 14px; text-align: center; margin-bottom: 22px; }
+.profile-avatar { width: 50px; height: 50px; background: #1e8e3e; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 8px; font-size: 22px; }
+.profile-name { font-size: 14px; font-weight: bold; }
+.profile-role { font-size: 9px; opacity: 0.75; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 3px; }
+.nav { list-style: none; }
+.nav li { margin-bottom: 3px; }
+.nav a { color: white; text-decoration: none; padding: 10px 12px; display: block; border-radius: 8px; font-size: 13px; cursor: pointer; }
+.nav a:hover { background: rgba(255,255,255,0.1); }
+.nav a.active { background: #1e8e3e; }
+.main { flex: 1; margin-left: 250px; padding: 20px; }
+.topbar { background: white; border-radius: 12px; padding: 14px 20px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+.page-title { font-size: 19px; color: #064E3B; font-weight: 600; }
+.logout-btn { background: #C62828; color: white; padding: 7px 14px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600; }
+.section { display: none; }
+.section.active { display: block; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.stat { background: white; border-radius: 12px; padding: 16px; border-left: 4px solid #1e8e3e; cursor: pointer; }
+.stat:hover { transform: translateY(-2px); }
+.stat-val { font-size: 26px; font-weight: bold; color: #1e8e3e; }
+.stat-lbl { font-size: 11px; color: #666; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.3px; }
+.stat.warn { border-left-color: #ff9800; } .stat.warn .stat-val { color: #ff9800; }
+.stat.danger { border-left-color: #c62828; } .stat.danger .stat-val { color: #c62828; }
+.card { background: white; border-radius: 12px; padding: 18px; margin-bottom: 16px; }
+.card-title { font-size: 14px; color: #064E3B; font-weight: 600; margin-bottom: 12px; padding-left: 10px; border-left: 3px solid #1e8e3e; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
+.list-row { padding: 9px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.list-row:last-child { border-bottom: none; }
+.badge { padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+.badge.ok { background: #e8f5e9; color: #2e7d32; }
+.badge.warn { background: #fff3e0; color: #e65100; }
+.badge.danger { background: #ffebee; color: #c62828; }
+.badge.info { background: #e3f2fd; color: #1565c0; }
+.table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.table th { text-align: left; padding: 9px; background: #f9fafb; color: #374151; font-weight: 600; border-bottom: 1px solid #e5e7eb; font-size: 11px; text-transform: uppercase; }
+.table td { padding: 11px 9px; border-bottom: 1px solid #f0f0f0; }
+.btn { border: none; padding: 7px 13px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; text-decoration: none; display: inline-block; }
+.btn-primary { background: #1e8e3e; color: white; }
+.btn-info { background: #2196F3; color: white; }
+.btn-sm { padding: 5px 9px; font-size: 11px; }
+.empty { text-align: center; padding: 28px; color: #999; font-size: 13px; font-style: italic; }
+.search-bar { width: 100%; padding: 9px 13px; border: 1px solid #ddd; border-radius: 8px; font-size: 13px; margin-bottom: 12px; }
+.filter-row { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.filter-row input { padding: 8px 11px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="layout">
+<aside class="sidebar">
+<div class="logo">FastAfya</div>
+<div class="logo-sub">HOSPITAL DIRECTOR</div>
+<div class="profile">
+<div class="profile-avatar">👔</div>
+<div class="profile-name">{{ super_admin.full_name }}</div>
+<div class="profile-role">{{ session.hospital_name or 'Hospital' }}</div>
+</div>
+<ul class="nav">
+<li><a class="active" onclick="showSection('overview', this)">📊 Overview</a></li>
+<li><a onclick="showSection('departments', this)">🏥 Departments</a></li>
+<li><a onclick="showSection('patients', this)">👥 Patients</a></li>
+<li><a onclick="showSection('conversations', this)">💬 Conversations</a></li>
+<li><a onclick="showSection('referrals', this)">↔️ Internal Referrals</a></li>
+<li><a onclick="showSection('emergencies', this)">🚨 Emergencies</a></li>
+<li><a onclick="showSection('prescriptions', this)">💊 Prescriptions</a></li>
+<li><a onclick="showSection('audit', this)">📋 Audit Logs</a></li>
+<li><a onclick="showSection('alerts', this)">🔔 Alerts</a></li>
+<li><a onclick="showSection('settings', this)">⚙️ Settings</a></li>
+</ul>
+</aside>
+<main class="main">
+<div class="topbar">
+<div class="page-title" id="pageTitle">📊 Overview</div>
+<a href="/logout" class="logout-btn">🚪 Logout</a>
+</div>
+
+<section id="sec-overview" class="section active">
+<div class="stats">
+<div class="stat" onclick="showSection('patients', null)"><div class="stat-val">{{ stats.total_patients }}</div><div class="stat-lbl">👥 Patients</div></div>
+<div class="stat" onclick="showSection('departments', null)"><div class="stat-val">{{ stats.active_departments }}</div><div class="stat-lbl">🏥 Departments</div></div>
+<div class="stat" onclick="showSection('emergencies', null)"><div class="stat-val">{{ stats.open_emergencies }}</div><div class="stat-lbl">🚨 Open Emergencies</div></div>
+<div class="stat {% if stats.unanswered > 0 %}warn{% endif %}" onclick="showSection('conversations', null)"><div class="stat-val">{{ stats.unanswered }}</div><div class="stat-lbl">⚠️ Unanswered</div></div>
+<div class="stat" onclick="showSection('prescriptions', null)"><div class="stat-val">{{ stats.refills_week }}</div><div class="stat-lbl">💊 Refills 7d</div></div>
+</div>
+<div class="two-col">
+<div class="card">
+<div class="card-title">🔔 Live Activity</div>
+{% if activity %}{% for a in activity %}
+<div class="list-row"><div>{{ a.text }}</div><div style="color: #999; font-size: 11px;">{{ a.when }}</div></div>
+{% endfor %}{% else %}<div class="empty">No activity yet.</div>{% endif %}
+</div>
+<div class="card">
+<div class="card-title">⚠️ Alerts</div>
+{% if alerts %}{% for a in alerts %}
+<div class="list-row"><div>{{ a.text }}</div><span class="badge {{ a.level }}">{{ a.level }}</span></div>
+{% endfor %}{% else %}<div class="empty">All clear.</div>{% endif %}
+</div>
+</div>
+<div class="card">
+<div class="card-title">🏥 Department Health</div>
+<table class="table">
+<thead><tr><th>Department</th><th>Open Chats</th><th>Unanswered</th><th>Last Response</th><th>Status</th></tr></thead>
+<tbody>
+{% for d in dept_health %}
+<tr>
+<td><strong>{{ d.name }}</strong></td>
+<td>{{ d.open_chats }}</td>
+<td>{{ d.unanswered }}</td>
+<td>{{ d.last_response }}</td>
+<td><span class="badge {{ d.status_class }}">{{ d.status_label }}</span></td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+</section>
+
+<section id="sec-departments" class="section">
+<div class="card">
+<div class="card-title">➕ Create New Department</div>
+<form method="POST" action="/hospital/departments/create">
+<div class="filter-row">
+<input type="text" name="name" placeholder="Department name *" required style="flex: 1;">
+<input type="text" name="head_doctor" placeholder="Head doctor" style="flex: 1;">
+<input type="text" name="secretary_name" placeholder="Secretary name" style="flex: 1;">
+</div>
+<div class="filter-row">
+<input type="text" name="username" placeholder="Login username *" required style="flex: 1;">
+<input type="text" name="password" placeholder="Password (6+) *" required style="flex: 1;">
+<input type="text" name="phone" placeholder="Phone" style="flex: 1;">
+<button type="submit" class="btn btn-primary">CREATE</button>
+</div>
+</form>
+</div>
+<div class="card">
+<div class="card-title">🏥 All Departments ({{ departments|length }})</div>
+{% if departments %}
+<table class="table">
+<thead><tr><th>Name</th><th>Head Doctor</th><th>Secretary</th><th>Username</th><th>Status</th></tr></thead>
+<tbody>
+{% for d in departments %}
+<tr>
+<td><strong>{{ d.name }}</strong></td>
+<td>{{ d.head_doctor or '—' }}</td>
+<td>{{ d.secretary_name or '—' }}</td>
+<td><code>{{ d.username or 'not set' }}</code></td>
+<td>{% if d.is_active %}<span class="badge ok">Active</span>{% else %}<span class="badge danger">Inactive</span>{% endif %}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+{% else %}<div class="empty">No departments yet.</div>{% endif %}
+</div>
+</section>
+
+<section id="sec-patients" class="section">
+<div class="card">
+<div class="card-title">👥 All Patients ({{ patients|length }})</div>
+<input type="text" class="search-bar" id="patientSearch" placeholder="Search..." oninput="filterTable('patientsTable', 'patientSearch')">
+<table class="table" id="patientsTable">
+<thead><tr><th>ID</th><th>Name</th><th>Location</th><th>Phone</th><th>Registered</th><th>Status</th></tr></thead>
+<tbody>
+{% for p in patients %}
+<tr>
+<td><code>{{ p.patient_id }}</code></td>
+<td>{{ p.full_name }}</td>
+<td>{{ p.location or '—' }}</td>
+<td>{{ p.phone_number }}</td>
+<td>{{ p.registration_date[:10] if p.registration_date else '—' }}</td>
+<td><span class="badge ok">{{ p.status }}</span></td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+</section>
+
+<section id="sec-conversations" class="section">
+<div class="card">
+<div class="card-title">💬 Recent Conversations</div>
+{% if conversations %}
+<table class="table">
+<thead><tr><th>Patient</th><th>Department</th><th>Last Message</th><th>Status</th></tr></thead>
+<tbody>{% for c in conversations %}
+<tr><td>{{ c.patient_name }}</td><td>{{ c.department_name }}</td><td>{{ c.last_message[:80] }}</td><td><span class="badge {{ c.status_class }}">{{ c.status_label }}</span></td></tr>
+{% endfor %}</tbody>
+</table>
+{% else %}<div class="empty">No conversations yet.</div>{% endif %}
+</div>
+</section>
+
+<section id="sec-referrals" class="section">
+<div class="card">
+<div class="card-title">↔️ Department-to-Department Referrals</div>
+{% if referrals %}
+<table class="table">
+<thead><tr><th>From</th><th>To</th><th>Patient</th><th>Message</th></tr></thead>
+<tbody>{% for r in referrals %}
+<tr><td>{{ r.from_name }}</td><td>{{ r.to_name }}</td><td><code>{{ r.patient_id }}</code></td><td>{{ r.content[:80] }}</td></tr>
+{% endfor %}</tbody>
+</table>
+{% else %}<div class="empty">No referrals yet.</div>{% endif %}
+</div>
+</section>
+
+<section id="sec-emergencies" class="section">
+<div class="card">
+<div class="card-title">🚨 Active Emergencies</div>
+{% if active_emergencies %}
+<table class="table">
+<thead><tr><th>Patient</th><th>Location</th><th>Sent</th><th>Response</th></tr></thead>
+<tbody>{% for e in active_emergencies %}
+<tr><td><strong>{{ e.patient_name }}</strong></td><td>{{ e.location_address or '—' }}</td><td>{{ e.when }}</td><td>{% if e.responded %}<span class="badge ok">{{ e.response_time }}</span>{% else %}<span class="badge danger">Pending</span>{% endif %}</td></tr>
+{% endfor %}</tbody>
+</table>
+{% else %}<div class="empty">No active emergencies.</div>{% endif %}
+</div>
+<div class="card">
+<div class="card-title">📜 Resolved Emergencies</div>
+{% if resolved_emergencies %}
+<table class="table">
+<thead><tr><th>Patient</th><th>Sent</th><th>Resolved</th><th>Response Time</th></tr></thead>
+<tbody>{% for e in resolved_emergencies %}
+<tr><td><strong>{{ e.patient_name }}</strong></td><td>{{ e.when }}</td><td>{{ e.resolved_when }}</td><td><span class="badge ok">{{ e.response_time }}</span></td></tr>
+{% endfor %}</tbody>
+</table>
+{% else %}<div class="empty">No resolved emergencies.</div>{% endif %}
+</div>
+</section>
+
+<section id="sec-prescriptions" class="section">
+<div class="card">
+<div class="card-title">💊 Recent Prescriptions</div>
+{% if prescriptions %}
+<table class="table">
+<thead><tr><th>Patient</th><th>Department</th><th>Medication</th><th>Date</th></tr></thead>
+<tbody>{% for p in prescriptions %}
+<tr><td>{{ p.patient_name }}</td><td>{{ p.department_name }}</td><td>{{ p.medication_name }}</td><td>{{ p.when }}</td></tr>
+{% endfor %}</tbody>
+</table>
+{% else %}<div class="empty">No prescriptions yet.</div>{% endif %}
+</div>
+<div class="card">
+<div class="card-title">💊 Refill Activity</div>
+{% if refills %}
+<table class="table">
+<thead><tr><th>Patient</th><th>Medication</th><th>Status</th><th>Date</th></tr></thead>
+<tbody>{% for r in refills %}
+<tr><td>{{ r.patient_name }}</td><td>{{ r.medication_name }}</td><td><span class="badge {{ r.status_class }}">{{ r.status }}</span></td><td>{{ r.when }}</td></tr>
+{% endfor %}</tbody>
+</table>
+{% else %}<div class="empty">No refills yet.</div>{% endif %}
+</div>
+</section>
+
+<section id="sec-audit" class="section">
+<div class="card">
+<div class="card-title">📋 Audit Logs</div>
+<input type="text" class="search-bar" id="auditSearch" placeholder="Search..." oninput="filterTable('auditTable', 'auditSearch')">
+<table class="table" id="auditTable">
+<thead><tr><th>Time</th><th>User</th><th>Action</th><th>Details</th></tr></thead>
+<tbody>{% for a in audit %}
+<tr><td>{{ a.when }}</td><td>{{ a.user_type }}: {{ a.user_id }}</td><td><span class="badge info">{{ a.action }}</span></td><td>{{ a.details or '—' }}</td></tr>
+{% endfor %}</tbody>
+</table>
+</div>
+</section>
+
+<section id="sec-alerts" class="section">
+<div class="card">
+<div class="card-title">🔔 System Alerts</div>
+{% if alerts %}{% for a in alerts %}
+<div class="list-row"><div>{{ a.text }}</div><span class="badge {{ a.level }}">{{ a.level }}</span></div>
+{% endfor %}{% else %}<div class="empty">No alerts.</div>{% endif %}
+</div>
+</section>
+
+<section id="sec-settings" class="section">
+<div class="card">
+<div class="card-title">⚙️ Account</div>
+<div class="list-row"><strong>Director:</strong> <span>{{ super_admin.full_name }}</span></div>
+<div class="list-row"><strong>Username:</strong> <code>{{ super_admin.username }}</code></div>
+<div class="list-row"><strong>Hospital:</strong> <span>{{ session.hospital_name or 'Not set' }}</span></div>
+</div>
+<div class="card">
+<div class="card-title">🔑 Change Password</div>
+<form method="POST" action="/super_admin/change_password">
+<div class="filter-row">
+<input type="password" name="current_password" placeholder="Current password" required style="flex: 1;">
+<input type="password" name="new_password" placeholder="New password (6+)" required minlength="6" style="flex: 1;">
+<button type="submit" class="btn btn-primary">CHANGE</button>
+</div>
+</form>
+</div>
+</section>
+</main>
+</div>
+<script>
+function showSection(name, el) {
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.getElementById('sec-' + name).classList.add('active');
+    document.querySelectorAll('.nav a').forEach(a => a.classList.remove('active'));
+    if (el) { el.classList.add('active'); }
+    const titles = { overview:'📊 Overview', departments:'🏥 Departments', patients:'👥 Patients', conversations:'💬 Conversations', referrals:'↔️ Internal Referrals', emergencies:'🚨 Emergencies', prescriptions:'💊 Prescriptions', audit:'📋 Audit Logs', alerts:'🔔 Alerts', settings:'⚙️ Settings' };
+    document.getElementById('pageTitle').innerText = titles[name] || name;
+}
+function filterTable(tableId, inputId) {
+    const q = document.getElementById(inputId).value.toLowerCase();
+    document.querySelectorAll('#' + tableId + ' tbody tr').forEach(r => { r.style.display = r.innerText.toLowerCase().includes(q) ? '' : 'none'; });
+}
+</script>
+</body>
+</html>

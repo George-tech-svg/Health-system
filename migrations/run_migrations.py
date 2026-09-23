@@ -13,10 +13,14 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 MIGRATIONS_DIR = Path(__file__).parent
 
 SQL_FILES = [
-    "000_schema.sql",                  # creates all tables
-    "001_hospitals_auth.sql",          # adds auth columns (idempotent)
-    "002_patients_hospital_link.sql",  # links patients (idempotent)
-    "003_indexes.sql",                 # performance indexes
+    "000_schema.sql",
+    "001_hospitals_auth.sql",
+    "002_patients_hospital_link.sql",
+    "003_indexes.sql",
+    "005_departments.sql",
+    "006_super_admin.sql",
+    "007_super_admin_hospital.sql",
+    "008_department_full.sql",
 ]
 
 

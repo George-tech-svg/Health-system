@@ -2,6 +2,9 @@
 import os
 import ssl
 import pg8000.native
+import threading
+import queue
+from cache import get_or_set, invalidate
 from datetime import datetime, timedelta
 from urllib.parse import urlparse, parse_qs
 from dotenv import load_dotenv
@@ -9,6 +12,65 @@ from password_utils import hash_password, verify_password
 
 load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL")
+
+
+_thread_local = threading.local()
+
+# Global connection pool — shared across all threads/requests
+_conn_pool = queue.Queue(maxsize=10)
+_pool_lock = threading.Lock()
+_pool_initialized = False
+
+
+def _init_pool(pool_size=5):
+    """Warm up the pool in parallel — 5 connections take ~3s instead of ~15s."""
+    global _pool_initialized
+    with _pool_lock:
+        if _pool_initialized:
+            return
+        _pool_initialized = True
+
+    parsed = _parse_neon_url(DATABASE_URL)
+    created_conns = []
+    errors = []
+    lock = threading.Lock()
+
+    def _warm_one():
+        try:
+            c = pg8000.native.Connection(
+                user=parsed["user"],
+                password=parsed["password"],
+                host=parsed["host"],
+                port=parsed["port"],
+                database=parsed["database"],
+                ssl_context=parsed.get("ssl_context"),
+            )
+            with lock:
+                created_conns.append(c)
+        except Exception as e:
+            with lock:
+                errors.append(str(e))
+
+    # Fire all warm-ups in parallel
+    threads = [threading.Thread(target=_warm_one, daemon=True) for _ in range(pool_size)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=20)
+
+    for c in created_conns:
+        try:
+            _conn_pool.put_nowait(c)
+        except queue.Full:
+            try:
+                c.close()
+            except Exception:
+                pass
+
+    print(f"Connection pool warmed with {len(created_conns)} connections (parallel)")
+    if errors:
+        print(f"  {len(errors)} warm-up errors (first: {errors[0][:80]})")
+
 
 
 def _parse_neon_url(url):
@@ -30,9 +92,25 @@ def _parse_neon_url(url):
     return kwargs
 
 
+
+
+def _reconnect(old_conn):
+    """Rebuild a pg8000.native.Connection from the same DATABASE_URL."""
+    parsed = _parse_neon_url(DATABASE_URL)
+    return pg8000.native.Connection(
+        user=parsed["user"],
+        password=parsed["password"],
+        host=parsed["host"],
+        port=parsed["port"],
+        database=parsed["database"],
+        ssl_context=parsed.get("ssl_context"),
+    )
+
+
 class PGCursor:
-    def __init__(self, native_conn):
+    def __init__(self, native_conn, parent=None):
         self._conn = native_conn
+        self._parent = parent
         self._lastrowid = None
         self._results = []
         self._index = 0
@@ -58,10 +136,27 @@ class PGCursor:
         if is_insert and not has_returning:
             stripped = stripped + " RETURNING id"
 
-        if params:
-            self._results = self._conn.run(stripped, **params)
-        else:
-            self._results = self._conn.run(stripped)
+        def _run():
+            if params:
+                return self._conn.run(stripped, **params)
+            return self._conn.run(stripped)
+
+        try:
+            self._results = _run()
+        except Exception as e:
+            err = str(e)
+            if "prepared statement" in err or "26000" in err or "connection is closed" in err:
+                # statement cache lost or connection dropped — reconnect and retry
+                try:
+                    self._conn.close()
+                except Exception:
+                    pass
+                self._conn = _reconnect(self._conn)
+                if self._parent is not None:
+                    self._parent._conn = self._conn
+                self._results = _run()
+            else:
+                raise
 
         if is_insert and not has_returning:
             if self._results:
@@ -79,7 +174,12 @@ class PGCursor:
 
     @property
     def rowcount(self):
-        return len(self._results)
+        if self._results is None:
+            return 0
+        try:
+            return len(self._results)
+        except TypeError:
+            return 0
 
     def fetchone(self):
         if self._index < len(self._results):
@@ -98,11 +198,12 @@ class PGCursor:
 
 
 class PGConnection:
-    def __init__(self, native_conn):
+    def __init__(self, native_conn, pooled=False):
         self._conn = native_conn
+        self._pooled = pooled
 
     def cursor(self):
-        return PGCursor(self._conn)
+        return PGCursor(self._conn, parent=self)
 
     def commit(self):
         pass
@@ -111,7 +212,20 @@ class PGConnection:
         pass
 
     def close(self):
-        self._conn.close()
+        # If pooled, return connection to the global pool
+        if self._pooled:
+            try:
+                _conn_pool.put_nowait(self._conn)
+            except queue.Full:
+                try:
+                    self._conn.close()
+                except Exception:
+                    pass
+            return
+        try:
+            self._conn.close()
+        except Exception:
+            pass
 
     def __enter__(self):
         return self
@@ -126,16 +240,34 @@ class Database:
             raise RuntimeError("DATABASE_URL is not set. Check your .env file.")
 
     def get_connection(self):
-        parsed = _parse_neon_url(DATABASE_URL)
-        conn = pg8000.native.Connection(
-            user=parsed["user"],
-            password=parsed["password"],
-            host=parsed["host"],
-            port=parsed["port"],
-            database=parsed["database"],
-            ssl_context=parsed.get("ssl_context"),
-        )
-        return PGConnection(conn)
+        """Return a warm connection from the global pool."""
+        if not _pool_initialized:
+            _init_pool()
+        try:
+            conn = _conn_pool.get(timeout=10)
+            return PGConnection(conn, pooled=True)
+        except queue.Empty:
+            # Pool exhausted — create a one-off
+            parsed = _parse_neon_url(DATABASE_URL)
+            conn = pg8000.native.Connection(
+                user=parsed["user"],
+                password=parsed["password"],
+                host=parsed["host"],
+                port=parsed["port"],
+                database=parsed["database"],
+                ssl_context=parsed.get("ssl_context"),
+            )
+            return PGConnection(conn, pooled=False)
+
+    def close_all_connections(self):
+        """Force-close this thread's connection (used on shutdown)."""
+        existing = getattr(_thread_local, "conn", None)
+        if existing is not None:
+            try:
+                existing.close()
+            except Exception:
+                pass
+            _thread_local.conn = None
 
     def record_failed_login(self, username=None, phone_number=None, ip_address=None):
         conn = self.get_connection()
@@ -631,12 +763,14 @@ class Database:
         return result
 
     def get_all_villages(self):
-        conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT name FROM villages ORDER BY name")
-        rows = cursor.fetchall()
-        conn.close()
-        return [r[0] for r in rows]
+        def _fetch():
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT name FROM villages ORDER BY name")
+            rows = cursor.fetchall()
+            conn.close()
+            return [r[0] for r in rows]
+        return get_or_set("all_villages", _fetch, ttl_seconds=300)
 
     def get_nearest_hospital(self, village_name):
         conn = self.get_connection()
@@ -1396,3 +1530,556 @@ class Database:
         )
         conn.commit()
         conn.close()
+
+
+    # ============================================================
+    # DEPARTMENTS
+    # ============================================================
+    def get_hospital_departments(self, hospital_id, active_only=True):
+        def _fetch():
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            sql = """SELECT id, name, description, head_doctor, secretary_name, phone,
+                            email, consultation_fee, operating_hours, username, is_active
+                     FROM departments WHERE hospital_id = ?"""
+            if active_only:
+                sql += " AND is_active = 1"
+            sql += " ORDER BY name"
+            cursor.execute(sql, (hospital_id,))
+            rows = cursor.fetchall()
+            conn.close()
+            return [
+                {"id": r[0], "name": r[1], "description": r[2], "head_doctor": r[3],
+                 "secretary_name": r[4], "phone": r[5], "email": r[6],
+                 "consultation_fee": r[7], "operating_hours": r[8],
+                 "username": r[9], "is_active": r[10]}
+                for r in rows
+            ]
+        return get_or_set(f"depts_{hospital_id}_{active_only}", _fetch, ttl_seconds=120)
+
+    def get_department_by_id(self, department_id):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """SELECT id, hospital_id, name, description, head_doctor, secretary_name,
+                      phone, email, consultation_fee, operating_hours, username,
+                      is_active, created_at
+               FROM departments WHERE id = ?""",
+            (department_id,),
+        )
+        r = cursor.fetchone()
+        conn.close()
+        if r:
+            return {
+                "id": r[0], "hospital_id": r[1], "name": r[2], "description": r[3],
+                "head_doctor": r[4], "secretary_name": r[5], "phone": r[6],
+                "email": r[7], "consultation_fee": r[8], "operating_hours": r[9],
+                "username": r[10], "is_active": r[11], "created_at": r[12],
+            }
+        return None
+
+    def get_department_by_username(self, username):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """SELECT d.id, d.hospital_id, d.name, d.description, d.head_doctor,
+                      d.secretary_name, d.phone, d.email, d.consultation_fee,
+                      d.operating_hours, d.username, d.password_hash, d.is_active,
+                      h.name, h.county, h.sub_county
+               FROM departments d
+               JOIN hospitals h ON d.hospital_id = h.id
+               WHERE d.username = ? AND d.is_active = 1""",
+            (username,),
+        )
+        r = cursor.fetchone()
+        conn.close()
+        if r:
+            return {
+                "id": r[0], "hospital_id": r[1], "name": r[2], "description": r[3],
+                "head_doctor": r[4], "secretary_name": r[5], "phone": r[6],
+                "email": r[7], "consultation_fee": r[8], "operating_hours": r[9],
+                "username": r[10], "password_hash": r[11], "is_active": r[12],
+                "hospital_name": r[13], "hospital_county": r[14],
+                "hospital_sub_county": r[15],
+            }
+        return None
+
+    def create_department(self, hospital_id, name, description="", head_doctor="",
+                          secretary_name="", phone="", email="", consultation_fee="",
+                          operating_hours="24/7", username=None, password=None):
+        from password_utils import hash_password
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        pw_hash = hash_password(password) if password else None
+        cursor.execute(
+            """INSERT INTO departments
+               (hospital_id, name, description, head_doctor, secretary_name, phone,
+                email, consultation_fee, operating_hours, username, password_hash,
+                is_active, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)""",
+            (hospital_id, name, description, head_doctor, secretary_name, phone,
+             email, consultation_fee, operating_hours, username, pw_hash,
+             datetime.now().isoformat()),
+        )
+        invalidate('depts_')
+        dept_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        return dept_id
+
+    def update_department(self, department_id, **kwargs):
+        allowed = ["name", "description", "head_doctor", "secretary_name", "phone",
+                   "email", "consultation_fee", "operating_hours", "username",
+                   "is_active"]
+        fields = []
+        params = []
+        for k, v in kwargs.items():
+            if k in allowed and v is not None:
+                fields.append(k + " = ?")
+                params.append(v)
+        if kwargs.get("password"):
+            from password_utils import hash_password
+            fields.append("password_hash = ?")
+            params.append(hash_password(kwargs["password"]))
+        if not fields:
+            return False
+        params.append(department_id)
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE departments SET " + ", ".join(fields) + " WHERE id = ?",
+            tuple(params),
+        )
+        invalidate('depts_')
+        conn.commit()
+        conn.close()
+        return True
+
+    def delete_department(self, department_id, hospital_id=None):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        if hospital_id:
+            cursor.execute(
+                "DELETE FROM departments WHERE id = ? AND hospital_id = ?",
+                (department_id, hospital_id),
+            )
+        else:
+            cursor.execute("DELETE FROM departments WHERE id = ?", (department_id,))
+        conn.commit()
+        conn.close()
+
+    def authenticate_department(self, username, password):
+        from password_utils import verify_password
+        dept = self.get_department_by_username(username)
+        if not dept:
+            return None
+        if not dept.get("password_hash"):
+            return None
+        if verify_password(password, dept["password_hash"]):
+            return dept
+        return None
+
+    # ============================================================
+    # DEPARTMENT PHOTOS
+    # ============================================================
+    def add_department_photo(self, department_id, filename, caption=""):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """INSERT INTO department_photos (department_id, filename, caption, created_at)
+               VALUES (?, ?, ?, ?)""",
+            (department_id, filename, caption, datetime.now().isoformat()),
+        )
+        pid = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        return pid
+
+    def get_department_photos(self, department_id):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """SELECT id, filename, caption, created_at
+               FROM department_photos WHERE department_id = ?
+               ORDER BY id DESC""",
+            (department_id,),
+        )
+        rows = cursor.fetchall()
+        conn.close()
+        return [
+            {"id": r[0], "filename": r[1], "caption": r[2], "created_at": r[3]}
+            for r in rows
+        ]
+
+    def delete_department_photo(self, photo_id, department_id):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "DELETE FROM department_photos WHERE id = ? AND department_id = ?",
+            (photo_id, department_id),
+        )
+        conn.commit()
+        conn.close()
+
+    # ============================================================
+    # DEPARTMENT SERVICES
+    # ============================================================
+    def add_department_service(self, department_id, name, description=""):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """INSERT INTO department_services (department_id, name, description, created_at)
+               VALUES (?, ?, ?, ?)""",
+            (department_id, name, description, datetime.now().isoformat()),
+        )
+        sid = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        return sid
+
+    def get_department_services(self, department_id):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """SELECT id, name, description FROM department_services
+               WHERE department_id = ? ORDER BY name""",
+            (department_id,),
+        )
+        rows = cursor.fetchall()
+        conn.close()
+        return [{"id": r[0], "name": r[1], "description": r[2]} for r in rows]
+
+    def delete_department_service(self, service_id, department_id):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "DELETE FROM department_services WHERE id = ? AND department_id = ?",
+            (service_id, department_id),
+        )
+        conn.commit()
+        conn.close()
+
+    # ============================================================
+    # TRIAGE ENGINE
+    # ============================================================
+    def get_triage_rules(self):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """SELECT id, keywords, department_name, priority, is_emergency
+               FROM triage_rules ORDER BY priority DESC"""
+        )
+        rows = cursor.fetchall()
+        conn.close()
+        return [
+            {"id": r[0], "keywords": r[1], "department_name": r[2],
+             "priority": r[3], "is_emergency": r[4]}
+            for r in rows
+        ]
+
+    def suggest_department(self, symptom_text):
+        if not symptom_text:
+            return None
+        text = symptom_text.lower()
+        best = None
+        for rule in self.get_triage_rules():
+            kws = [k.strip().lower() for k in rule["keywords"].split(",") if k.strip()]
+            matched = [k for k in kws if k in text]
+            if matched:
+                score = rule["priority"] + len(matched) * 5
+                if rule["is_emergency"]:
+                    score += 50
+                if best is None or score > best["score"]:
+                    best = {
+                        "department_name": rule["department_name"],
+                        "is_emergency": bool(rule["is_emergency"]),
+                        "matched_keywords": matched,
+                        "score": score,
+                    }
+        return best
+
+    # ============================================================
+    # SUPER ADMIN METHODS
+    # ============================================================
+    def create_super_admin(self, username, password, full_name, hospital_id,
+                            email="", phone=""):
+        from password_utils import hash_password
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """INSERT INTO super_admins
+               (username, password_hash, full_name, hospital_id, email, phone,
+                is_active, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, 1, ?)""",
+            (username, hash_password(password), full_name, hospital_id,
+             email, phone, datetime.now().isoformat()),
+        )
+        sid = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        return sid
+
+    def get_super_admin_by_username(self, username):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """SELECT id, username, password_hash, full_name, hospital_id,
+                      email, phone, is_active, last_login, created_at
+               FROM super_admins WHERE username = ? AND is_active = 1""",
+            (username,),
+        )
+        r = cursor.fetchone()
+        conn.close()
+        if r:
+            return {
+                "id": r[0], "username": r[1], "password_hash": r[2],
+                "full_name": r[3], "hospital_id": r[4], "email": r[5],
+                "phone": r[6], "is_active": r[7], "last_login": r[8],
+                "created_at": r[9],
+            }
+        return None
+
+    def update_super_admin_hospital(self, super_admin_id, hospital_id):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE super_admins SET hospital_id = ? WHERE id = ?",
+            (hospital_id, super_admin_id),
+        )
+        conn.commit()
+        conn.close()
+
+
+
+    # ============================================================
+    # APPOINTMENTS
+    # ============================================================
+    def create_appointment(self, patient_id, department_id, appointment_date,
+                            time_slot="", purpose="", symptoms=""):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """INSERT INTO appointments
+               (patient_id, department_id, appointment_date, time_slot, purpose,
+                symptoms, status, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)""",
+            (patient_id, department_id, appointment_date, time_slot, purpose,
+             symptoms, datetime.now().isoformat()),
+        )
+        appt_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        return appt_id
+
+    def get_patient_appointments(self, patient_id):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """SELECT a.id, a.department_id, d.name, a.appointment_date,
+                      a.time_slot, a.purpose, a.symptoms, a.status, a.created_at
+               FROM appointments a
+               JOIN departments d ON a.department_id = d.id
+               WHERE a.patient_id = ?
+               ORDER BY a.appointment_date DESC""",
+            (patient_id,),
+        )
+        rows = cursor.fetchall()
+        conn.close()
+        return [{
+            "id": r[0], "department_id": r[1], "department_name": r[2],
+            "appointment_date": r[3], "time_slot": r[4], "purpose": r[5],
+            "symptoms": r[6], "status": r[7], "created_at": r[8],
+        } for r in rows]
+
+    def get_department_appointments(self, department_id, status_filter=None):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        base = """SELECT a.id, a.patient_id, p.full_name, a.appointment_date,
+                         a.time_slot, a.purpose, a.symptoms, a.status, a.created_at
+                  FROM appointments a
+                  JOIN patients p ON a.patient_id = p.patient_id
+                  WHERE a.department_id = ?"""
+        params = [department_id]
+        if status_filter:
+            base += " AND a.status = ?"
+            params.append(status_filter)
+        base += " ORDER BY a.appointment_date DESC"
+        cursor.execute(base, tuple(params))
+        rows = cursor.fetchall()
+        conn.close()
+        return [{
+            "id": r[0], "patient_id": r[1], "patient_name": r[2],
+            "appointment_date": r[3], "time_slot": r[4], "purpose": r[5],
+            "symptoms": r[6], "status": r[7], "created_at": r[8],
+        } for r in rows]
+
+    def update_appointment_status(self, appt_id, status, department_id=None):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        if department_id:
+            cursor.execute(
+                "UPDATE appointments SET status = ?, updated_at = ? WHERE id = ? AND department_id = ?",
+                (status, datetime.now().isoformat(), appt_id, department_id),
+            )
+        else:
+            cursor.execute(
+                "UPDATE appointments SET status = ?, updated_at = ? WHERE id = ?",
+                (status, datetime.now().isoformat(), appt_id),
+            )
+        conn.commit()
+        conn.close()
+
+    # ============================================================
+    # DEPARTMENT ENQUIRIES
+    # ============================================================
+    def get_department_threads(self, department_id):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """SELECT m.patient_id, p.full_name,
+                      (SELECT content FROM messages WHERE patient_id = m.patient_id AND department_id = ? ORDER BY timestamp DESC LIMIT 1),
+                      (SELECT timestamp FROM messages WHERE patient_id = m.patient_id AND department_id = ? ORDER BY timestamp DESC LIMIT 1),
+                      (SELECT COUNT(*) FROM messages WHERE patient_id = m.patient_id AND department_id = ? AND direction = 'outgoing' AND is_read = 0)
+               FROM messages m
+               JOIN patients p ON m.patient_id = p.patient_id
+               WHERE m.department_id = ? AND (m.is_deleted IS NULL OR m.is_deleted = 0)
+               GROUP BY m.patient_id, p.full_name
+               ORDER BY MAX(m.timestamp) DESC""",
+            (department_id, department_id, department_id, department_id),
+        )
+        rows = cursor.fetchall()
+        conn.close()
+        return [{"patient_id": r[0], "patient_name": r[1], "last_message": r[2] or "",
+                 "last_time": r[3], "unread": r[4] or 0} for r in rows]
+
+    def get_department_patient_thread(self, patient_id, department_id):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """SELECT id, direction, type, content, timestamp, audio_file, video_file, is_read
+               FROM messages
+               WHERE patient_id = ? AND department_id = ? AND (is_deleted IS NULL OR is_deleted = 0)
+               ORDER BY timestamp ASC""",
+            (patient_id, department_id),
+        )
+        rows = cursor.fetchall()
+        conn.close()
+        return [{"id": r[0], "direction": r[1], "type": r[2], "content": r[3],
+                 "timestamp": r[4], "audio_file": r[5], "video_file": r[6],
+                 "is_read": r[7]} for r in rows]
+
+    def send_department_message(self, patient_id, department_id, direction,
+                                 content, audio_file=None, video_file=None, msg_type="sms"):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """INSERT INTO messages
+               (patient_id, department_id, direction, type, content, language,
+                risk_level, timestamp, audio_file, video_file, is_delivered)
+               VALUES (?, ?, ?, ?, ?, 'English', 'none', ?, ?, ?, 0)""",
+            (patient_id, department_id, direction, msg_type, content,
+             datetime.now().isoformat(), audio_file, video_file),
+        )
+        mid = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        return mid
+
+    def mark_department_thread_read(self, patient_id, department_id):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE messages SET is_read = 1 WHERE patient_id = ? AND department_id = ? AND direction = 'outgoing' AND is_read = 0",
+            (patient_id, department_id),
+        )
+        conn.commit()
+        conn.close()
+
+    # ============================================================
+    # DEPARTMENT TREATMENTS
+    # ============================================================
+    def create_department_treatment(self, patient_id, department_id, department_name,
+                                     diagnosis, notes, next_appointment_date,
+                                     next_appointment_reason):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        now = datetime.now().isoformat()
+        cursor.execute(
+            """INSERT INTO treatments
+               (patient_id, department_id, doctor_name, treatment_date, diagnosis,
+                notes, next_appointment_date, next_appointment_reason, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (patient_id, department_id, department_name, now, diagnosis,
+             notes, next_appointment_date, next_appointment_reason, now),
+        )
+        tid = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        return tid
+
+    def get_department_treatments(self, department_id):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """SELECT t.id, t.patient_id, p.full_name, t.treatment_date, t.diagnosis,
+                      t.notes, t.next_appointment_date, t.status
+               FROM treatments t
+               JOIN patients p ON t.patient_id = p.patient_id
+               WHERE t.department_id = ?
+               ORDER BY t.treatment_date DESC""",
+            (department_id,),
+        )
+        rows = cursor.fetchall()
+        conn.close()
+        return [{"id": r[0], "patient_id": r[1], "patient_name": r[2],
+                 "treatment_date": r[3], "diagnosis": r[4], "notes": r[5],
+                 "next_appointment_date": r[6], "status": r[7]} for r in rows]
+
+    def get_department_patients(self, department_id):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """SELECT DISTINCT p.patient_id, p.full_name, p.phone_number, p.location
+               FROM patients p
+               WHERE p.patient_id IN (
+                   SELECT patient_id FROM treatments WHERE department_id = ?
+                   UNION SELECT patient_id FROM messages WHERE department_id = ?
+                   UNION SELECT patient_id FROM appointments WHERE department_id = ?
+               )
+               ORDER BY p.full_name""",
+            (department_id, department_id, department_id),
+        )
+        rows = cursor.fetchall()
+        conn.close()
+        return [{"patient_id": r[0], "full_name": r[1], "phone_number": r[2], "location": r[3]} for r in rows]
+
+    def get_department_stats(self, department_id):
+        """One combined query — safer and faster than 4 separate round trips."""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                """SELECT
+                       (SELECT COUNT(*) FROM treatments WHERE department_id = ?) AS t_count,
+                       (SELECT COUNT(*) FROM appointments WHERE department_id = ? AND status = 'pending') AS p_count,
+                       (SELECT COUNT(DISTINCT patient_id) FROM messages WHERE department_id = ? AND direction = 'outgoing' AND is_read = 0) AS u_count,
+                       (SELECT COUNT(DISTINCT patient_id) FROM messages WHERE department_id = ?) AS pt_count""",
+                (department_id, department_id, department_id, department_id),
+            )
+            row = cursor.fetchone()
+        except Exception as e:
+            print("get_department_stats error: " + str(e))
+            row = None
+        finally:
+            conn.close()
+
+        if not row:
+            return {"treatments": 0, "pending_appointments": 0, "unread_threads": 0, "patients": 0}
+
+        return {
+            "treatments": int(row[0] or 0),
+            "pending_appointments": int(row[1] or 0),
+            "unread_threads": int(row[2] or 0),
+            "patients": int(row[3] or 0),
+        }
+

@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FastAfya | {{ department.name }}</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f7fa; }
+.layout { display: flex; min-height: 100vh; }
+.sidebar { width: 250px; background: linear-gradient(180deg, #0D5C2E 0%, #064E3B 100%); color: white; padding: 22px 14px; position: fixed; height: 100vh; overflow-y: auto; }
+.logo { font-size: 20px; font-weight: bold; text-align: center; margin-bottom: 4px; }
+.logo-sub { font-size: 9px; opacity: 0.7; text-align: center; margin-bottom: 22px; letter-spacing: 1px; }
+.profile { background: rgba(255,255,255,0.1); border-radius: 12px; padding: 14px; text-align: center; margin-bottom: 22px; }
+.profile-avatar { width: 50px; height: 50px; background: #1e8e3e; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 8px; font-size: 22px; }
+.profile-name { font-size: 14px; font-weight: bold; }
+.profile-hospital { font-size: 10px; opacity: 0.65; margin-top: 4px; }
+.nav { list-style: none; }
+.nav li { margin-bottom: 3px; }
+.nav a { color: white; text-decoration: none; padding: 10px 12px; display: block; border-radius: 8px; font-size: 13px; cursor: pointer; }
+.nav a:hover { background: rgba(255,255,255,0.1); }
+.nav a.active { background: #1e8e3e; }
+.main { flex: 1; margin-left: 250px; padding: 20px; }
+.topbar { background: white; border-radius: 12px; padding: 14px 20px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+.page-title { font-size: 19px; color: #064E3B; font-weight: 600; }
+.logout-btn { background: #C62828; color: white; padding: 7px 14px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600; }
+.section { display: none; }
+.section.active { display: block; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; margin-bottom: 20px; }
+.stat { background: white; border-radius: 12px; padding: 16px; border-left: 4px solid #1e8e3e; }
+.stat-val { font-size: 26px; font-weight: bold; color: #1e8e3e; }
+.stat-lbl { font-size: 11px; color: #666; margin-top: 4px; text-transform: uppercase; }
+.card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 18px; }
+.card-title { font-size: 14px; color: #064E3B; font-weight: 600; margin-bottom: 14px; padding-left: 10px; border-left: 3px solid #1e8e3e; }
+.btn { border: none; padding: 8px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block; }
+.btn-primary { background: #1e8e3e; color: white; }
+.btn-info { background: #2196F3; color: white; }
+.btn-sm { padding: 5px 10px; font-size: 11px; }
+.empty { text-align: center; padding: 30px; color: #999; font-size: 13px; font-style: italic; }
+.thread { padding: 12px 14px; border-radius: 10px; background: #f8f9fa; margin-bottom: 8px; cursor: pointer; border-left: 3px solid #1e8e3e; }
+.thread:hover { background: #eff6ff; }
+.thread-name { font-weight: 600; font-size: 14px; color: #064E3B; }
+.thread-preview { font-size: 12px; color: #666; margin-top: 4px; }
+.thread-meta { font-size: 11px; color: #999; margin-top: 4px; display: flex; justify-content: space-between; }
+.unread { background: #ffebee; color: #c62828; padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: bold; }
+.msg { padding: 10px 14px; border-radius: 14px; margin-bottom: 8px; max-width: 75%; }
+.msg-out { background: #dcf8c5; margin-left: auto; }
+.msg-in { background: #f0f0f0; }
+.msg-time { font-size: 10px; color: #999; margin-top: 4px; }
+.chat-input { display: flex; gap: 8px; margin-top: 12px; }
+.chat-input input { flex: 1; padding: 10px 14px; border: 1px solid #ddd; border-radius: 20px; font-size: 13px; }
+.form-row { display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.form-row input, .form-row textarea, .form-row select { flex: 1; min-width: 160px; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 13px; font-family: inherit; }
+label { display: block; font-size: 11px; font-weight: 600; color: #555; margin-bottom: 4px; text-transform: uppercase; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; padding: 10px; background: #f9fafb; color: #374151; font-weight: 600; border-bottom: 1px solid #e5e7eb; font-size: 11px; text-transform: uppercase; }
+td { padding: 11px 10px; border-bottom: 1px solid #f0f0f0; }
+.badge { padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+.badge.pending { background: #fff3e0; color: #e65100; }
+.badge.confirmed { background: #e3f2fd; color: #1565c0; }
+.badge.completed { background: #e8f5e9; color: #2e7d32; }
+.badge.cancelled { background: #ffebee; color: #c62828; }
+.modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+.modal.active { display: flex; }
+.modal-content { background: white; border-radius: 12px; padding: 26px; max-width: 620px; width: 90%; max-height: 90vh; overflow-y: auto; }
+</style>
+</head>
+<body>
+<div class="layout">
+<aside class="sidebar">
+<div class="logo">FastAfya</div>
+<div class="logo-sub">DEPARTMENT PORTAL</div>
+<div class="profile">
+<div class="profile-avatar">🩺</div>
+<div class="profile-name">{{ department.name }}</div>
+<div class="profile-hospital">{{ department.hospital_name or 'Hospital' }}</div>
+</div>
+<ul class="nav">
+<li><a class="active" onclick="showSection('overview', this)">📊 Overview</a></li>
+<li><a onclick="showSection('enquiries', this); loadThreads()">💬 Patient Enquiries</a></li>
+<li><a onclick="showSection('bookings', this); loadBookings()">📅 Bookings</a></li>
+<li><a onclick="showSection('patients', this); loadPatients()">👥 My Patients</a></li>
+<li><a onclick="showSection('treatments', this); loadTreatments()">💊 Treatments</a></li>
+<li><a onclick="showSection('prescribe', this); loadPatientDropdown()">✍️ Prescribe</a></li>
+<li><a onclick="showSection('photos', this)">📸 Photos</a></li>
+<li><a onclick="showSection('services', this)">🩺 Services</a></li>
+<li><a onclick="showSection('profile', this)">📋 Department Info</a></li>
+</ul>
+</aside>
+
+<main class="main">
+<div class="topbar">
+<div class="page-title" id="pageTitle">📊 Overview — {{ department.name }}</div>
+<a href="/logout" class="logout-btn">🚪 Logout</a>
+</div>
+
+<!-- OVERVIEW -->
+<section id="sec-overview" class="section active">
+<div class="stats">
+<div class="stat"><div class="stat-val">{{ stats.treatments }}</div><div class="stat-lbl">Treatments Written</div></div>
+<div class="stat"><div class="stat-val">{{ stats.patients }}</div><div class="stat-lbl">Active Patients</div></div>
+<div class="stat"><div class="stat-val">{{ stats.pending_appointments }}</div><div class="stat-lbl">Pending Bookings</div></div>
+<div class="stat"><div class="stat-val">{{ stats.unread_threads }}</div><div class="stat-lbl">Unread Enquiries</div></div>
+</div>
+<div class="card">
+<div class="card-title">📌 Department Powers</div>
+<div style="font-size: 13px; line-height: 2; color: #555;">
+<strong>You are a full operating unit of the hospital.</strong> Within your department, you can:<br>
+✅ Receive patient enquiries and reply<br>
+✅ Manage bookings and check-ins<br>
+✅ Record and treat patients of this department<br>
+✅ Write treatments and prescribe medications<br>
+✅ Approve or deny refills for your own patients<br>
+✅ Resolve emergencies routed to your department<br>
+✅ Upload photos and add services<br>
+✅ Delete your own messages and records<br>
+<br>
+<strong>What stays with the Director:</strong> hospital-wide data, department creation, and cross-department disputes.
+</div>
+</div>
+</section>
+
+<!-- ENQUIRIES -->
+<section id="sec-enquiries" class="section">
+<div style="display: flex; gap: 16px;">
+<div class="card" style="width: 320px; flex-shrink: 0;">
+<div class="card-title">💬 Patient Threads</div>
+<div id="threadList"><div class="empty">Loading...</div></div>
+</div>
+<div class="card" style="flex: 1;">
+<div class="card-title" id="threadHeader">Select a patient to view the conversation</div>
+<div id="threadMessages" style="min-height: 320px; max-height: 500px; overflow-y: auto; padding: 10px; background: #f9fafb; border-radius: 10px;">
+<div class="empty">No conversation selected</div>
+</div>
+<div class="chat-input" id="replyArea" style="display: none;">
+<input type="text" id="replyInput" placeholder="Type your reply..." onkeypress="if(event.key==='Enter') sendReply()">
+<button class="btn btn-primary" onclick="sendReply()">Send</button>
+</div>
+</div>
+</div>
+</section>
+
+<!-- BOOKINGS -->
+<section id="sec-bookings" class="section">
+<div class="card">
+<div class="card-title">📅 Bookings</div>
+<div id="bookingsList"><div class="empty">Loading...</div></div>
+</div>
+</section>
+
+<!-- PATIENTS -->
+<section id="sec-patients" class="section">
+<div class="card">
+<div class="card-title">👥 Patients Treated in This Department</div>
+<div id="patientsList"><div class="empty">Loading...</div></div>
+</div>
+</section>
+
+<!-- TREATMENTS -->
+<section id="sec-treatments" class="section">
+<div class="card">
+<div class="card-title">💊 Treatments Written by This Department</div>
+<div id="treatmentsList"><div class="empty">Loading...</div></div>
+</div>
+</section>
+
+<!-- PRESCRIBE -->
+<section id="sec-prescribe" class="section">
+<div class="card">
+<div class="card-title">✍️ Write a New Treatment</div>
+<div class="form-row">
+<div style="flex: 1;">
+<label>Patient</label>
+<select id="prescribePatient" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
+<option value="">-- Select Patient --</option>
+</select>
+</div>
+</div>
+<div class="form-row">
+<div style="flex: 1;">
+<label>Diagnosis</label>
+<input type="text" id="prescribeDiagnosis" placeholder="e.g., Malaria, Upper respiratory infection">
+</div>
+</div>
+<div class="form-row">
+<div style="flex: 1;">
+<label>Notes</label>
+<textarea id="prescribeNotes" rows="2" placeholder="Additional notes"></textarea>
+</div>
+</div>
+<div class="form-row">
+<div style="flex: 1;">
+<label>Next Appointment Date</label>
+<input type="date" id="prescribeNextDate">
+</div>
+<div style="flex: 1;">
+<label>Reason</label>
+<input type="text" id="prescribeNextReason" placeholder="e.g., Follow-up">
+</div>
+</div>
+<div class="card-title" style="margin-top: 16px;">💊 Medications</div>
+<div id="medList">
+<div class="form-row">
+<input type="text" class="med-name" placeholder="Medication name">
+<input type="text" class="med-dosage" placeholder="Dosage (e.g., 1)">
+<input type="text" class="med-unit" placeholder="Unit (pill, ml)" value="pill">
+<input type="text" class="med-times" placeholder="Times/day" value="2">
+<input type="text" class="med-schedule" placeholder="Times (e.g., 08:00,20:00)" value="08:00,20:00">
+<input type="number" class="med-duration" placeholder="Days" value="7">
+</div>
+</div>
+<button class="btn btn-info btn-sm" onclick="addMedRow()">+ Add Another Medication</button>
+<button class="btn btn-primary" style="margin-top: 16px; padding: 12px 24px;" onclick="submitPrescription()">SAVE TREATMENT</button>
+</div>
+</section>
+
+<!-- PHOTOS -->
+<section id="sec-photos" class="section">
+<div class="card">
+<div class="card-title">📸 My Department Photos</div>
+<form id="photoForm" enctype="multipart/form-data" style="margin-bottom: 16px;">
+<div class="form-row">
+<input type="file" id="photoFile" name="photo" accept="image/*" required>
+<input type="text" id="photoCaption" name="caption" placeholder="Caption (optional)">
+<button type="submit" class="btn btn-primary">Upload</button>
+</div>
+</form>
+<div id="photosGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px;">
+{% for p in photos %}
+<div style="border-radius: 10px; overflow: hidden; background: #eee; aspect-ratio: 4/3;">
+<img src="{{ p.filename }}" alt="photo" style="width: 100%; height: 100%; object-fit: cover;">
+</div>
+{% endfor %}
+{% if not photos %}
+<div class="empty">No photos yet. Upload one above.</div>
+{% endif %}
+</div>
+</div>
+</section>
+
+<!-- SERVICES -->
+<section id="sec-services" class="section">
+<div class="card">
+<div class="card-title">🩺 Services Offered</div>
+<form id="serviceForm" style="margin-bottom: 16px;">
+<div class="form-row">
+<input type="text" id="serviceName" placeholder="Service name (e.g., Blood test)" required>
+<input type="text" id="serviceDesc" placeholder="Description (optional)">
+<button type="submit" class="btn btn-primary">Add</button>
+</div>
+</form>
+<div>
+{% for s in services %}
+<div style="background: #f8f9fa; padding: 12px 15px; border-radius: 8px; margin-bottom: 8px; border-left: 3px solid #1e8e3e;">
+<strong>{{ s.name }}</strong>
+{% if s.description %}<div style="font-size: 12px; color: #666; margin-top: 4px;">{{ s.description }}</div>{% endif %}
+</div>
+{% endfor %}
+{% if not services %}<div class="empty">No services yet.</div>{% endif %}
+</div>
+</div>
+</section>
+
+<!-- PROFILE -->
+<section id="sec-profile" class="section">
+<div class="card">
+<div class="card-title">📋 Department Information</div>
+<div style="padding: 10px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px;"><strong>Name:</strong> {{ department.name }}</div>
+<div style="padding: 10px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px;"><strong>Hospital:</strong> {{ department.hospital_name }}</div>
+<div style="padding: 10px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px;"><strong>Head Doctor:</strong> {{ department.head_doctor or '—' }}</div>
+<div style="padding: 10px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px;"><strong>Secretary:</strong> {{ department.secretary_name or '—' }}</div>
+<div style="padding: 10px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px;"><strong>Phone:</strong> {{ department.phone or '—' }}</div>
+<div style="padding: 10px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px;"><strong>Hours:</strong> {{ department.operating_hours or '24/7' }}</div>
+<div style="padding: 10px 0; font-size: 13px;"><strong>Description:</strong> {{ department.description or '—' }}</div>
+</div>
+</section>
+
+</main>
+</div>
+
+<script>
+let currentThreadPatient = null;
+
+function showSection(name, el) {
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.getElementById('sec-' + name).classList.add('active');
+    document.querySelectorAll('.nav a').forEach(a => a.classList.remove('active'));
+    if (el) el.classList.add('active');
+    const titles = { overview: '📊 Overview', enquiries: '💬 Patient Enquiries', bookings: '📅 Bookings', patients: '👥 My Patients', treatments: '💊 Treatments', prescribe: '✍️ Prescribe', photos: '📸 Photos', services: '🩺 Services', profile: '📋 Department Info' };
+    document.getElementById('pageTitle').innerText = titles[name] || name;
+}
+
+function loadThreads() {
+    fetch('/department/enquiries').then(r=>r.json()).then(list => {
+        const c = document.getElementById('threadList');
+        if (!list.length) { c.innerHTML = '<div class="empty">No enquiries yet.</div>'; return; }
+        c.innerHTML = list.map(t => `<div class="thread" onclick="openThread('${t.patient_id}')"><div class="thread-name">${t.patient_name}</div><div class="thread-preview">${(t.last_message||'').substring(0,60)}</div><div class="thread-meta"><span>${(t.last_time||'').substring(0,16)}</span>${t.unread ? '<span class="unread">'+t.unread+'</span>' : ''}</div></div>`).join('');
+    });
+}
+
+function openThread(pid) {
+    currentThreadPatient = pid;
+    fetch('/department/enquiry/' + pid).then(r=>r.json()).then(data => {
+        document.getElementById('threadHeader').innerText = '💬 ' + data.patient.name;
+        const c = document.getElementById('threadMessages');
+        if (!data.messages.length) { c.innerHTML = '<div class="empty">No messages yet.</div>'; }
+        else {
+            c.innerHTML = data.messages.map(m => `<div class="msg ${m.direction === 'incoming' ? 'msg-out' : 'msg-in'}">${m.content}<div class="msg-time">${(m.timestamp||'').substring(11,16)}</div></div>`).join('');
+            c.scrollTop = c.scrollHeight;
+        }
+        document.getElementById('replyArea').style.display = 'flex';
+    });
+}
+
+function sendReply() {
+    const input = document.getElementById('replyInput');
+    const content = input.value.trim();
+    if (!content || !currentThreadPatient) return;
+    const fd = new FormData();
+    fd.append('content', content);
+    fetch('/department/enquiry/' + currentThreadPatient + '/reply', { method: 'POST', body: fd })
+        .then(r => r.json()).then(res => {
+            if (res.status === 'success') { input.value = ''; openThread(currentThreadPatient); }
+            else alert('Error: ' + (res.error||''));
+        });
+}
+
+function loadBookings() {
+    fetch('/department/bookings').then(r=>r.json()).then(list => {
+        const c = document.getElementById('bookingsList');
+        if (!list.length) { c.innerHTML = '<div class="empty">No bookings yet.</div>'; return; }
+        let html = '<table><thead><tr><th>Patient</th><th>Date</th><th>Time</th><th>Purpose</th><th>Status</th><th>Action</th></tr></thead><tbody>';
+        list.forEach(a => {
+            html += `<tr><td>${a.patient_name}</td><td>${a.appointment_date}</td><td>${a.time_slot||''}</td><td>${a.purpose||''}</td><td><span class="badge ${a.status}">${a.status}</span></td><td>`;
+            if (a.status === 'pending') html += `<button class="btn btn-primary btn-sm" onclick="updateBooking(${a.id}, 'confirmed')">Confirm</button> `;
+            if (a.status === 'confirmed') html += `<button class="btn btn-info btn-sm" onclick="updateBooking(${a.id}, 'checked_in')">Check-in</button> `;
+            if (a.status === 'checked_in') html += `<button class="btn btn-primary btn-sm" onclick="updateBooking(${a.id}, 'completed')">Complete</button> `;
+            if (a.status !== 'completed' && a.status !== 'cancelled') html += `<button class="btn btn-sm" style="background:#f44336;color:white;" onclick="updateBooking(${a.id}, 'cancelled')">Cancel</button>`;
+            html += '</td></tr>';
+        });
+        html += '</tbody></table>';
+        c.innerHTML = html;
+    });
+}
+
+function updateBooking(id, status) {
+    fetch('/department/booking/' + id + '/status', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({status}) })
+        .then(r=>r.json()).then(() => loadBookings());
+}
+
+function loadPatients() {
+    fetch('/department/my-patients').then(r=>r.json()).then(list => {
+        const c = document.getElementById('patientsList');
+        if (!list.length) { c.innerHTML = '<div class="empty">No patients yet.</div>'; return; }
+        let html = '<table><thead><tr><th>ID</th><th>Name</th><th>Phone</th><th>Location</th></tr></thead><tbody>';
+        list.forEach(p => { html += `<tr><td><code>${p.patient_id}</code></td><td>${p.full_name}</td><td>${p.phone_number}</td><td>${p.location||''}</td></tr>`; });
+        html += '</tbody></table>';
+        c.innerHTML = html;
+    });
+}
+
+function loadTreatments() {
+    fetch('/department/treatments').then(r=>r.json()).then(list => {
+        const c = document.getElementById('treatmentsList');
+        if (!list.length) { c.innerHTML = '<div class="empty">No treatments written yet.</div>'; return; }
+        let html = '<table><thead><tr><th>Date</th><th>Patient</th><th>Diagnosis</th><th>Next Appointment</th></tr></thead><tbody>';
+        list.forEach(t => { html += `<tr><td>${(t.treatment_date||'').substring(0,10)}</td><td>${t.patient_name}</td><td>${t.diagnosis||'—'}</td><td>${t.next_appointment_date||'—'}</td></tr>`; });
+        html += '</tbody></table>';
+        c.innerHTML = html;
+    });
+}
+
+function loadPatientDropdown() {
+    fetch('/department/my-patients').then(r=>r.json()).then(list => {
+        const sel = document.getElementById('prescribePatient');
+        sel.innerHTML = '<option value="">-- Select Patient --</option>';
+        list.forEach(p => { sel.innerHTML += `<option value="${p.patient_id}">${p.full_name} (${p.patient_id})</option>`; });
+    });
+}
+
+function addMedRow() {
+    const div = document.createElement('div');
+    div.className = 'form-row';
+    div.innerHTML = '<input type="text" class="med-name" placeholder="Medication name"><input type="text" class="med-dosage" placeholder="Dosage"><input type="text" class="med-unit" placeholder="Unit" value="pill"><input type="text" class="med-times" placeholder="Times/day" value="2"><input type="text" class="med-schedule" placeholder="Times" value="08:00,20:00"><input type="number" class="med-duration" placeholder="Days" value="7">';
+    document.getElementById('medList').appendChild(div);
+}
+
+function submitPrescription() {
+    const pid = document.getElementById('prescribePatient').value;
+    if (!pid) { alert('Pick a patient'); return; }
+    const meds = [];
+    document.querySelectorAll('#medList .form-row').forEach(row => {
+        const name = row.querySelector('.med-name').value.trim();
+        if (name) {
+            meds.push({
+                medication_name: name,
+                dosage_amount: row.querySelector('.med-dosage').value || '1',
+                dosage_unit: row.querySelector('.med-unit').value || 'pill',
+                times_per_day: parseInt(row.querySelector('.med-times').value) || 2,
+                schedule_times: (row.querySelector('.med-schedule').value || '08:00').split(',').map(s=>s.trim()),
+                duration_days: parseInt(row.querySelector('.med-duration').value) || 7,
+                instructions: ''
+            });
+        }
+    });
+    const payload = {
+        patient_id: pid,
+        diagnosis: document.getElementById('prescribeDiagnosis').value,
+        notes: document.getElementById('prescribeNotes').value,
+        next_appointment_date: document.getElementById('prescribeNextDate').value,
+        next_appointment_reason: document.getElementById('prescribeNextReason').value,
+        medications: meds,
+    };
+    fetch('/department/prescribe', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) })
+        .then(r => r.json()).then(res => {
+            if (res.status === 'success') { alert('Treatment saved and patient notified.'); loadTreatments(); }
+            else alert('Error: ' + (res.error||''));
+        });
+}
+
+document.getElementById('photoForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const fd = new FormData();
+    fd.append('photo', document.getElementById('photoFile').files[0]);
+    fd.append('caption', document.getElementById('photoCaption').value);
+    fetch('/department/photo/upload', { method: 'POST', body: fd })
+        .then(r=>r.json()).then(res => { if (res.status === 'success') location.reload(); else alert('Upload failed'); });
+});
+
+document.getElementById('serviceForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const fd = new FormData();
+    fd.append('name', document.getElementById('serviceName').value);
+    fd.append('description', document.getElementById('serviceDesc').value);
+    fetch('/department/service/add', { method: 'POST', body: fd })
+        .then(r=>r.json()).then(res => { if (res.status === 'success') location.reload(); else alert('Failed'); });
+});
+</script>
+</body>
+</html>
