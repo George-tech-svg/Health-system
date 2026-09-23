@@ -96,7 +96,7 @@ def main():
         print("DATABASE_URL not set. Check your .env file.")
         sys.exit(1)
 
-    print("\n=== AFYAHIV CARE - PostgreSQL Migration ===\n")
+    print("\n=== FastAfya - PostgreSQL Migration ===\n")
     print(f"Target: {DATABASE_URL.split('@')[-1]}\n")
 
     try:

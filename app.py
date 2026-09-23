@@ -1,4 +1,4 @@
-# app.py - AFYAHIV CARE (Hospital-based model, PostgreSQL)
+# app.py - FastAfya (Hospital-based model, PostgreSQL)
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 from database import Database
 from ai_engine import AIEngine
@@ -17,7 +17,7 @@ import json
 import atexit
 
 app = Flask(__name__)
-app.secret_key = "afyahiv-care-secret-key-2024"
+app.secret_key = "fastafya-secret-key-2024"
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=60)
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024
 
@@ -1289,7 +1289,7 @@ if __name__ == '__main__':
             os.makedirs(dir_name)
 
     print("\n" + "="*70)
-    print("AFYAHIV CARE - Hospital-Based Model")
+    print("FastAfya - Hospital-Based Model")
     print("="*70)
     print("\nHospital Login: siaya.hospital / hospital123")
     print("Or register a new hospital at /hospital/register")

@@ -1,4 +1,4 @@
-# database.py - PostgreSQL version for AFYAHIV CARE
+# database.py - PostgreSQL version for FastAfya
 import os
 import ssl
 import pg8000.native

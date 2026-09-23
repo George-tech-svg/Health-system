@@ -1,4 +1,4 @@
-# AFYAHIV CARE
+# FastAfya
 
 ## AI-Powered Multilingual Medication Adherence and Health Monitoring System for HIV Patients
 
@@ -6,7 +6,7 @@
 
 ## Project Overview
 
-AFYAHIV CARE is a comprehensive digital health system designed to improve antiretroviral therapy (ART) adherence and strengthen symptom monitoring for people living with HIV. The system addresses practical barriers that affect continuity of care in low-resource settings, including low literacy levels, language barriers, limited smartphone access, and weak follow-up systems.
+FastAfya is a comprehensive digital health system designed to improve antiretroviral therapy (ART) adherence and strengthen symptom monitoring for people living with HIV. The system addresses practical barriers that affect continuity of care in low-resource settings, including low literacy levels, language barriers, limited smartphone access, and weak follow-up systems.
 
 The solution combines multilingual SMS reminders, simulated voice interaction, symptom intake, rule-based risk analysis, and a provider dashboard for monitoring adherence and emergency alerts. The system uses a simulation methodology to model communication flows, symptom reporting, and triage logic under representative patient scenarios.
 
@@ -87,8 +87,8 @@ text
 ### Step 1: Clone the Repository
 
 ```bash
-git clone https://github.com/George-tech-svg/AFYAHIV-CARE.git
-cd AFYAHIV-CARE
+git clone https://github.com/George-tech-svg/FastAfya.git
+cd FastAfya
 Step 2: Install Dependencies
 bash
 pip install -r requirements.txt
@@ -202,7 +202,7 @@ Deployment
 The system is deployed on Render.com and accessible at:
 
 text
-https://afyahiv-care.onrender.com
+https://fastafya.onrender.com
 Deployment Steps
 Push code to GitHub repository
 
@@ -240,7 +240,7 @@ Troubleshooting
 Common Issues and Solutions
 Issue	Solution
 Module not found	Run pip install -r requirements.txt
-Database error	Delete afyahiv_care.db and restart
+Database error	Delete fastafya.db and restart
 Port already in use	Change port in app.py from 5000 to 5001
 Login fails	Ensure Patient ID and phone number match registered values
 Session expired	Login again (auto-logout after 15 minutes)

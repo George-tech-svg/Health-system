@@ -1,4 +1,4 @@
-# sms_handler.py - SMS handling for AFYAHIV CARE (No chat saving)
+# sms_handler.py - SMS handling for FastAfya (No chat saving)
 class SMSHandler:
     def __init__(self, ai_engine, database):
         self.ai_engine = ai_engine

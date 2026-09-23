@@ -18,31 +18,31 @@ HOSPITAL_CREDENTIALS = {
         "username": "siaya.hospital",
         "county": "Siaya", "sub_county": "Siaya Town",
         "contact_person": "Hospital Administrator",
-        "contact_email": "siaya@afyahiv.co.ke",
+        "contact_email": "siaya@fastafya.co.ke",
     },
     "Bondo Sub-County Hospital": {
         "username": "bondo.hospital",
         "county": "Siaya", "sub_county": "Bondo",
         "contact_person": "Hospital Administrator",
-        "contact_email": "bondo@afyahiv.co.ke",
+        "contact_email": "bondo@fastafya.co.ke",
     },
     "Jaramogi Oginga Odinga Hospital": {
         "username": "kisumu.hospital",
         "county": "Kisumu", "sub_county": "Kisumu Central",
         "contact_person": "Hospital Administrator",
-        "contact_email": "kisumu@afyahiv.co.ke",
+        "contact_email": "kisumu@fastafya.co.ke",
     },
     "Rangala Health Centre": {
         "username": "rangala.hospital",
         "county": "Siaya", "sub_county": "Rangala",
         "contact_person": "Hospital Administrator",
-        "contact_email": "rangala@afyahiv.co.ke",
+        "contact_email": "rangala@fastafya.co.ke",
     },
     "Ugunja Sub-County Hospital": {
         "username": "ugunja.hospital",
         "county": "Siaya", "sub_county": "Ugunja",
         "contact_person": "Hospital Administrator",
-        "contact_email": "ugunja@afyahiv.co.ke",
+        "contact_email": "ugunja@fastafya.co.ke",
     },
 }
 

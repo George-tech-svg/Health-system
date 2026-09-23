@@ -1,5 +1,5 @@
 -- 000_schema.sql
--- Full schema for AFYAHIV CARE (PostgreSQL / Neon)
+-- Full schema for FastAfya (PostgreSQL / Neon)
 
 -- ============================================================
 -- PATIENTS

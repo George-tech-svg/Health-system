@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>AFYAHIV CARE | Patient Dashboard</title>
+    <title>FastAfya | Patient Dashboard</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
@@ -300,7 +300,7 @@
 <body>
     <div class="dashboard-container">
         <div class="sidebar">
-            <div class="logo"><h1>AFYAHIV CARE</h1><p class="logo-subtitle">Medication Adherence System</p></div>
+            <div class="logo"><h1>FastAfya</h1><p class="logo-subtitle">Medication Adherence System</p></div>
             <div class="patient-info">
                 <div class="patient-avatar">{{ patient_id[0] if patient_id else 'P' }}</div>
                 <div class="patient-id">Patient ID: {{ patient_id }}</div>
@@ -850,7 +850,7 @@
                 if (!el.hasAttribute('data-key')) el.innerHTML = currentLanguage === 'Kiswahili' ? '✅ Imetatuliwa' : '✅ Resolved';
             });
             
-            localStorage.setItem('afyahiv_language', currentLanguage);
+            localStorage.setItem('fastafya_language', currentLanguage);
             const langSelect = document.getElementById('languageSelect');
             if (langSelect) langSelect.value = currentLanguage;
             document.getElementById('currentLangDisplay').innerText = currentLanguage;
@@ -867,7 +867,7 @@
         function t(key) { return translations[currentLanguage][key] || translations['English'][key] || key; }
         
         function initLanguage() {
-            const savedLang = localStorage.getItem('afyahiv_language');
+            const savedLang = localStorage.getItem('fastafya_language');
             if (savedLang && (savedLang === 'English' || savedLang === 'Kiswahili')) { currentLanguage = savedLang; }
             else { const browserLang = navigator.language || navigator.userLanguage; currentLanguage = (browserLang && (browserLang.toLowerCase().includes('sw') || browserLang.toLowerCase().includes('kis'))) ? 'Kiswahili' : 'English'; }
             translatePage();

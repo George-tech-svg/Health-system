@@ -1,6 +1,6 @@
 import sqlite3
 
-conn = sqlite3.connect('afyahiv_care.db')
+conn = sqlite3.connect('fastafya.db')
 cursor = conn.cursor()
 
 # Check and add is_delivered column if not exists

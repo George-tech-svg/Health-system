@@ -1,6 +1,6 @@
 import sqlite3
 
-conn = sqlite3.connect('afyahiv_care.db')
+conn = sqlite3.connect('fastafya.db')
 cursor = conn.cursor()
 
 cursor.execute("SELECT id, patient_id, content, audio_file FROM messages WHERE type = 'voice' ORDER BY id DESC LIMIT 5")
