@@ -55,11 +55,52 @@ body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:
 .search-bar { width: 100%; padding: 9px 13px; border: 1px solid #ddd; border-radius: 8px; font-size: 13px; margin-bottom: 12px; }
 .filter-row { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
 .filter-row input { padding: 8px 11px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; }
+
+/* === Collapsible Sidebar === */
+.sidebar { transition: width 0.25s ease; }
+.main { transition: margin-left 0.25s ease; }
+.sidebar-toggle {
+    position: absolute;
+    top: 12px;
+    right: 10px;
+    background: rgba(255,255,255,0.15);
+    color: white;
+    border: none;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+}
+.sidebar-toggle:hover { background: rgba(255,255,255,0.25); }
+
+body.sidebar-collapsed .sidebar { width: 72px !important; padding: 22px 8px !important; }
+body.sidebar-collapsed .main { margin-left: 72px !important; }
+body.sidebar-collapsed .sidebar .logo,
+body.sidebar-collapsed .sidebar .logo-sub,
+body.sidebar-collapsed .sidebar .profile-name,
+body.sidebar-collapsed .sidebar .profile-role,
+body.sidebar-collapsed .sidebar .profile-hospital,
+body.sidebar-collapsed .sidebar .nav a span.label {
+    display: none !important;
+}
+body.sidebar-collapsed .sidebar .profile { padding: 8px 4px; }
+body.sidebar-collapsed .sidebar .profile-avatar { width: 36px; height: 36px; font-size: 16px; margin: 0 auto; }
+body.sidebar-collapsed .sidebar .nav a { text-align: center; padding: 12px 4px; font-size: 18px; }
+body.sidebar-collapsed .sidebar .nav a i,
+body.sidebar-collapsed .sidebar .nav a .nav-icon { display: inline-block; margin: 0; }
+body.sidebar-collapsed .sidebar .nav a .nav-text { display: none; }
+
 </style>
 </head>
 <body>
 <div class="layout">
 <aside class="sidebar">
+<button class="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">☰</button>
 <div class="logo">FastAfya</div>
 <div class="logo-sub">HOSPITAL DIRECTOR</div>
 <div class="profile">
@@ -68,16 +109,16 @@ body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:
 <div class="profile-role">{{ session.hospital_name or 'Hospital' }}</div>
 </div>
 <ul class="nav">
-<li><a class="active" onclick="showSection('overview', this)">📊 Overview</a></li>
-<li><a onclick="showSection('departments', this)">🏥 Departments</a></li>
-<li><a onclick="showSection('patients', this)">👥 Patients</a></li>
-<li><a onclick="showSection('conversations', this)">💬 Conversations</a></li>
-<li><a onclick="showSection('referrals', this)">↔️ Internal Referrals</a></li>
-<li><a onclick="showSection('emergencies', this)">🚨 Emergencies</a></li>
-<li><a onclick="showSection('prescriptions', this)">💊 Prescriptions</a></li>
-<li><a onclick="showSection('audit', this)">📋 Audit Logs</a></li>
-<li><a onclick="showSection('alerts', this)">🔔 Alerts</a></li>
-<li><a onclick="showSection('settings', this)">⚙️ Settings</a></li>
+<li><a class="active" onclick="showSection('overview', this)"><span class="nav-icon">📊</span> <span class="nav-text">Overview</span></a></li>
+<li><a onclick="showSection('departments', this)"><span class="nav-icon">🏥</span> <span class="nav-text">Departments</span></a></li>
+<li><a onclick="showSection('patients', this)"><span class="nav-icon">👥</span> <span class="nav-text">Patients</span></a></li>
+<li><a onclick="showSection('conversations', this)"><span class="nav-icon">💬</span> <span class="nav-text">Conversations</span></a></li>
+<li><a onclick="showSection('referrals', this)"><span class="nav-icon">↔️</span> <span class="nav-text">Internal Referrals</span></a></li>
+<li><a onclick="showSection('emergencies', this)"><span class="nav-icon">🚨</span> <span class="nav-text">Emergencies</span></a></li>
+<li><a onclick="showSection('prescriptions', this)"><span class="nav-icon">💊</span> <span class="nav-text">Prescriptions</span></a></li>
+<li><a onclick="showSection('audit', this)"><span class="nav-icon">📋</span> <span class="nav-text">Audit Logs</span></a></li>
+<li><a onclick="showSection('alerts', this)"><span class="nav-icon">🔔</span> <span class="nav-text">Alerts</span></a></li>
+<li><a onclick="showSection('settings', this)"><span class="nav-icon">⚙️</span> <span class="nav-text">Settings</span></a></li>
 </ul>
 </aside>
 <main class="main">
@@ -321,5 +362,25 @@ function filterTable(tableId, inputId) {
     document.querySelectorAll('#' + tableId + ' tbody tr').forEach(r => { r.style.display = r.innerText.toLowerCase().includes(q) ? '' : 'none'; });
 }
 </script>
+
+<script>
+(function() {
+    var KEY = 'fastafya_sidebar_collapsed';
+    if (localStorage.getItem(KEY) === '1') {
+        document.body.classList.add('sidebar-collapsed');
+    }
+    window.toggleSidebar = function() {
+        document.body.classList.toggle('sidebar-collapsed');
+        var collapsed = document.body.classList.contains('sidebar-collapsed') ? '1' : '0';
+        localStorage.setItem(KEY, collapsed);
+        // Force map to resize if present
+        setTimeout(function() {
+            if (window.doctorFloatingMap) window.doctorFloatingMap.invalidateSize();
+            if (window.patientFloatingMap) window.patientFloatingMap.invalidateSize();
+        }, 300);
+    };
+})();
+</script>
+
 </body>
 </html>

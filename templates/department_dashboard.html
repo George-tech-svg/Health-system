@@ -63,11 +63,52 @@ td { padding: 11px 10px; border-bottom: 1px solid #f0f0f0; }
 .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
 .modal.active { display: flex; }
 .modal-content { background: white; border-radius: 12px; padding: 26px; max-width: 620px; width: 90%; max-height: 90vh; overflow-y: auto; }
+
+/* === Collapsible Sidebar === */
+.sidebar { transition: width 0.25s ease; }
+.main { transition: margin-left 0.25s ease; }
+.sidebar-toggle {
+    position: absolute;
+    top: 12px;
+    right: 10px;
+    background: rgba(255,255,255,0.15);
+    color: white;
+    border: none;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+}
+.sidebar-toggle:hover { background: rgba(255,255,255,0.25); }
+
+body.sidebar-collapsed .sidebar { width: 72px !important; padding: 22px 8px !important; }
+body.sidebar-collapsed .main { margin-left: 72px !important; }
+body.sidebar-collapsed .sidebar .logo,
+body.sidebar-collapsed .sidebar .logo-sub,
+body.sidebar-collapsed .sidebar .profile-name,
+body.sidebar-collapsed .sidebar .profile-role,
+body.sidebar-collapsed .sidebar .profile-hospital,
+body.sidebar-collapsed .sidebar .nav a span.label {
+    display: none !important;
+}
+body.sidebar-collapsed .sidebar .profile { padding: 8px 4px; }
+body.sidebar-collapsed .sidebar .profile-avatar { width: 36px; height: 36px; font-size: 16px; margin: 0 auto; }
+body.sidebar-collapsed .sidebar .nav a { text-align: center; padding: 12px 4px; font-size: 18px; }
+body.sidebar-collapsed .sidebar .nav a i,
+body.sidebar-collapsed .sidebar .nav a .nav-icon { display: inline-block; margin: 0; }
+body.sidebar-collapsed .sidebar .nav a .nav-text { display: none; }
+
 </style>
 </head>
 <body>
 <div class="layout">
 <aside class="sidebar">
+<button class="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">☰</button>
 <div class="logo">FastAfya</div>
 <div class="logo-sub">DEPARTMENT PORTAL</div>
 <div class="profile">
@@ -76,15 +117,15 @@ td { padding: 11px 10px; border-bottom: 1px solid #f0f0f0; }
 <div class="profile-hospital">{{ department.hospital_name or 'Hospital' }}</div>
 </div>
 <ul class="nav">
-<li><a class="active" onclick="showSection('overview', this)">📊 Overview</a></li>
-<li><a onclick="showSection('enquiries', this); loadThreads()">💬 Patient Enquiries</a></li>
-<li><a onclick="showSection('bookings', this); loadBookings()">📅 Bookings</a></li>
-<li><a onclick="showSection('patients', this); loadPatients()">👥 My Patients</a></li>
-<li><a onclick="showSection('treatments', this); loadTreatments()">💊 Treatments</a></li>
-<li><a onclick="showSection('prescribe', this); loadPatientDropdown()">✍️ Prescribe</a></li>
-<li><a onclick="showSection('photos', this)">📸 Photos</a></li>
-<li><a onclick="showSection('services', this)">🩺 Services</a></li>
-<li><a onclick="showSection('profile', this)">📋 Department Info</a></li>
+<li><a class="active" onclick="showSection('overview', this)"><span class="nav-icon">📊</span> <span class="nav-text">Overview</span></a></li>
+<li><a onclick="showSection('enquiries', this); loadThreads()"><span class="nav-icon">💬</span> <span class="nav-text">Patient Enquiries</span></a></li>
+<li><a onclick="showSection('bookings', this); loadBookings()"><span class="nav-icon">📅</span> <span class="nav-text">Bookings</span></a></li>
+<li><a onclick="showSection('patients', this); loadPatients()"><span class="nav-icon">👥</span> <span class="nav-text">My Patients</span></a></li>
+<li><a onclick="showSection('treatments', this); loadTreatments()"><span class="nav-icon">💊</span> <span class="nav-text">Treatments</span></a></li>
+<li><a onclick="showSection('prescribe', this); loadPatientDropdown()"><span class="nav-icon">✍️</span> <span class="nav-text">Prescribe</span></a></li>
+<li><a onclick="showSection('photos', this)"><span class="nav-icon">📸</span> <span class="nav-text">Photos</span></a></li>
+<li><a onclick="showSection('services', this)"><span class="nav-icon">🩺</span> <span class="nav-text">Services</span></a></li>
+<li><a onclick="showSection('profile', this)"><span class="nav-icon">📋</span> <span class="nav-text">Department Info</span></a></li>
 </ul>
 </aside>
 
@@ -436,5 +477,25 @@ document.getElementById('serviceForm').addEventListener('submit', function(e) {
         .then(r=>r.json()).then(res => { if (res.status === 'success') location.reload(); else alert('Failed'); });
 });
 </script>
+
+<script>
+(function() {
+    var KEY = 'fastafya_sidebar_collapsed';
+    if (localStorage.getItem(KEY) === '1') {
+        document.body.classList.add('sidebar-collapsed');
+    }
+    window.toggleSidebar = function() {
+        document.body.classList.toggle('sidebar-collapsed');
+        var collapsed = document.body.classList.contains('sidebar-collapsed') ? '1' : '0';
+        localStorage.setItem(KEY, collapsed);
+        // Force map to resize if present
+        setTimeout(function() {
+            if (window.doctorFloatingMap) window.doctorFloatingMap.invalidateSize();
+            if (window.patientFloatingMap) window.patientFloatingMap.invalidateSize();
+        }, 300);
+    };
+})();
+</script>
+
 </body>
 </html>

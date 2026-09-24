@@ -295,11 +295,52 @@
             .panel-two-columns { flex-direction: column; }
             .panel-map-column { border-right: none; border-bottom: 1px solid #ddd; }
         }
-    </style>
+    
+/* === Collapsible Sidebar === */
+.sidebar { transition: width 0.25s ease; }
+.main { transition: margin-left 0.25s ease; }
+.sidebar-toggle {
+    position: absolute;
+    top: 12px;
+    right: 10px;
+    background: rgba(255,255,255,0.15);
+    color: white;
+    border: none;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+}
+.sidebar-toggle:hover { background: rgba(255,255,255,0.25); }
+
+body.sidebar-collapsed .sidebar { width: 72px !important; padding: 22px 8px !important; }
+body.sidebar-collapsed .main { margin-left: 72px !important; }
+body.sidebar-collapsed .sidebar .logo,
+body.sidebar-collapsed .sidebar .logo-sub,
+body.sidebar-collapsed .sidebar .profile-name,
+body.sidebar-collapsed .sidebar .profile-role,
+body.sidebar-collapsed .sidebar .profile-hospital,
+body.sidebar-collapsed .sidebar .nav a span.label {
+    display: none !important;
+}
+body.sidebar-collapsed .sidebar .profile { padding: 8px 4px; }
+body.sidebar-collapsed .sidebar .profile-avatar { width: 36px; height: 36px; font-size: 16px; margin: 0 auto; }
+body.sidebar-collapsed .sidebar .nav a { text-align: center; padding: 12px 4px; font-size: 18px; }
+body.sidebar-collapsed .sidebar .nav a i,
+body.sidebar-collapsed .sidebar .nav a .nav-icon { display: inline-block; margin: 0; }
+body.sidebar-collapsed .sidebar .nav a .nav-text { display: none; }
+
+</style>
 </head>
 <body>
     <div class="dashboard-container">
         <div class="sidebar">
+<button class="sidebar-toggle" onclick="toggleSidebar()" title="Toggle menu">☰</button>
             <div class="logo"><h1>FastAfya</h1><p class="logo-subtitle">Medication Adherence System</p></div>
             <div class="patient-info">
                 <div class="patient-avatar">{{ patient_id[0] if patient_id else 'P' }}</div>
@@ -307,15 +348,15 @@
                 <div style="margin-top: 12px; font-size: 11px;">Location: {{ patient_location }}<br>ARV: {{ patient_arv }}</div>
             </div>
             <ul class="nav-menu">
-                <li><a onclick="showSection('dashboard')" class="active" data-key="dashboard">📊 DASHBOARD</a></li>
-                <li><a onclick="showSection('chat')" data-key="normal_chat">💬 NORMAL CHAT</a></li>
-                <li><a onclick="showSection('emergency')" data-key="emergency">🔴 EMERGENCY</a></li>
-                <li><a onclick="showSection('medications')" data-key="my_medications">💊 MY MEDICATIONS</a></li>
-                <li><a onclick="showSection('treatments')" data-key="treatment_history">📋 TREATMENT HISTORY</a></li>
-                <li><a onclick="showSection('reminder')" data-key="reminder_settings">🎤 REMINDER SETTINGS</a></li>
-                <li><a onclick="showSection('hospital')" data-key="find_hospital">🏥 FIND HOSPITAL</a></li>
-                <li><a onclick="showSection('contacts')" data-key="emergency_contacts">👥 EMERGENCY CONTACTS</a></li>
-                <li><a onclick="showSection('settings')" data-key="settings">⚙️ SETTINGS</a></li>
+                <li><a onclick="showSection('dashboard')" class="active" data-key="dashboard"><span class="nav-icon">📊</span> <span class="nav-text">DASHBOARD</span></a></li>
+                <li><a onclick="showSection('chat')" data-key="normal_chat"><span class="nav-icon">💬</span> <span class="nav-text">NORMAL CHAT</span></a></li>
+                <li><a onclick="showSection('emergency')" data-key="emergency"><span class="nav-icon">🔴</span> <span class="nav-text">EMERGENCY</span></a></li>
+                <li><a onclick="showSection('medications')" data-key="my_medications"><span class="nav-icon">💊</span> <span class="nav-text">MY MEDICATIONS</span></a></li>
+                <li><a onclick="showSection('treatments')" data-key="treatment_history"><span class="nav-icon">📋</span> <span class="nav-text">TREATMENT HISTORY</span></a></li>
+                <li><a onclick="showSection('reminder')" data-key="reminder_settings"><span class="nav-icon">🎤</span> <span class="nav-text">REMINDER SETTINGS</span></a></li>
+                <li><a onclick="showSection('hospital')" data-key="find_hospital"><span class="nav-icon">🏥</span> <span class="nav-text">FIND HOSPITAL</span></a></li>
+                <li><a onclick="showSection('contacts')" data-key="emergency_contacts"><span class="nav-icon">👥</span> <span class="nav-text">EMERGENCY CONTACTS</span></a></li>
+                <li><a onclick="showSection('settings')" data-key="settings"><span class="nav-icon">⚙️</span> <span class="nav-text">SETTINGS</span></a></li>
             </ul>
         </div>
         
@@ -1586,5 +1627,25 @@
         document.addEventListener('DOMContentLoaded', () => { initLanguage(); showSection('dashboard'); setInterval(() => { if (document.getElementById('chatSection').classList.contains('active')) loadChatMessages(); }, 5000); loadEmergencyContacts(); });
         document.getElementById('messageInput')?.addEventListener('keypress', e => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendTextMessage(); } });
     </script>
+
+<script>
+(function() {
+    var KEY = 'fastafya_sidebar_collapsed';
+    if (localStorage.getItem(KEY) === '1') {
+        document.body.classList.add('sidebar-collapsed');
+    }
+    window.toggleSidebar = function() {
+        document.body.classList.toggle('sidebar-collapsed');
+        var collapsed = document.body.classList.contains('sidebar-collapsed') ? '1' : '0';
+        localStorage.setItem(KEY, collapsed);
+        // Force map to resize if present
+        setTimeout(function() {
+            if (window.doctorFloatingMap) window.doctorFloatingMap.invalidateSize();
+            if (window.patientFloatingMap) window.patientFloatingMap.invalidateSize();
+        }, 300);
+    };
+})();
+</script>
+
 </body>
 </html>
